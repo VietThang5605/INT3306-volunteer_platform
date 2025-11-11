@@ -1,0 +1,7 @@
+node_modules
+dist
+build
+.prisma
+.env
+logs
+test
