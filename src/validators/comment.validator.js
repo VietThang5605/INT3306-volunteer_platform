@@ -13,6 +13,9 @@ const createCommentSchema = Joi.object({
     'string.min': 'Nội dung bình luận không được để trống',
     'any.required': 'Nội dung bình luận là bắt buộc',
   }),
+  parentId: Joi.string().uuid().optional().allow(null).messages({
+    'string.guid': 'ID bình luận cha không hợp lệ',
+  }),
 });
 
 const commentIdSchema = Joi.object({

@@ -73,10 +73,24 @@ const deleteEvent = async (req, res, next) => {
   }
 };
 
+const getMyEvents = async (req, res, next) => {
+  try {
+    const managerId = req.user.id; // Lấy ID từ token
+    const options = req.query; // { page, limit, status, search }
+
+    const result = await eventService.getEventsByManager(managerId, options);
+    
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getPublicEvents,
   getPublicEvent,
   createEvent,
   updateEvent,
   deleteEvent,
+  getMyEvents,
 };

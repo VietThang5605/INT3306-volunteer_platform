@@ -5,7 +5,8 @@ const { auth, permit } = require('../../middlewares/auth');
 const validate = require('../../middlewares/validate');
 const { listEventsSchema, eventIdSchema, createEventSchema, updateEventSchema } = require('../../validators/event.validator');
 const { listRegistrationsSchema } = require('../../validators/registration.validator');
-const { listPostsSchema, createPostSchema } = require('../../validators/post.validator');
+const { listPostsSchema } = require('../../validators/post.validator');
+const upload = require('../../config/cloudinary');
 const postController = require('../../controllers/postController');
 const eventController = require('../../controllers/eventController');
 const registrationController = require('../../controllers/registrationController');
@@ -430,8 +431,24 @@ router.post(
   '/:id/posts',
   auth, // 1. Phải đăng nhập
   validate(eventIdSchema, 'params'), // 2. Validate ID sự kiện
-  validate(createPostSchema),      // 3. Validate body
+  // validate(createPostSchema),      // 3. Validate body
+  upload.array('media', 5),
   postController.createPost
+);
+
+router.get(
+  '/:id/trending-posts',
+  // auth,
+  validate(eventIdSchema, 'params'), // Validate ID sự kiện
+  postController.getTrendingByEvent
+);
+
+router.get(
+  '/me',
+  auth, // 1. Phải đăng nhập
+  permit('MANAGER'), // 2. (Tùy chọn) Nếu muốn chặn Volunteer gọi API này thì uncomment
+  validate(listEventsSchema, 'query'), // 3. Validate phân trang (page, limit...)
+  eventController.getMyEvents
 );
 
 module.exports = router;

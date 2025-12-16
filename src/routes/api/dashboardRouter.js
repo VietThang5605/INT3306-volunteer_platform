@@ -54,4 +54,9 @@ router.get(
   dashboardController.getDashboard // 2. Chạy logic
 );
 
+router.get(
+  '/stats',
+  dashboardController.getSystemStats
+);
+
 module.exports = router;

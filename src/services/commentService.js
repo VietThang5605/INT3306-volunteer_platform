@@ -2,96 +2,105 @@
 const prisma = require('../prisma/client');
 const createError = require('http-errors');
 const notificationService = require('./notificationService');
+const { verifyPostAccessibility } = require('./postService');
 
-const checkPostAccess = async (postId) => {
-  // 1. Tìm Post và Event
-  const post = await prisma.post.findUnique({
-    where: { id: postId },
-    select: {
-      id: true,
-      userId: true, // ID tác giả Post
-      event: {
-        select: {
-          status: true,
-          name: true, // Tên sự kiện
-        },
-      },
-    },
-  });
+const listCommentsForPost = async (postId, options, userId) => {
+  // 1. Check quyền xem bài viết
+  await verifyPostAccessibility(postId, userId);
 
-  // 2. Kiểm tra
-  if (!post || !post.event) {
-    throw createError(404, 'Không tìm thấy bài post hoặc sự kiện liên quan');
-  }
-  if (post.event.status !== 'APPROVED') {
-    throw createError(403, 'Không thể tương tác với bài post của sự kiện chưa được duyệt');
-  }
-  
-  return post; // Trả về post (chứa authorId) và event (chứa name)
-};
-
-const listCommentsForPost = async (postId, options) => {
-  // 1. Kiểm tra Post và Event có hợp lệ không
-  await checkPostAccess(postId);
-
-  // 2. (Code phòng thủ) Phân trang
   const page = parseInt(options.page, 10) || 1;
   const limit = parseInt(options.limit, 10) || 10;
   const skip = (page - 1) * limit;
-  const take = limit;
 
-  // 3. Lấy data và tổng số lượng
+  // 2. Query
+  // CHỈ LẤY COMMENT GỐC (parentId = null)
+  // Các reply sẽ được lấy lồng bên trong (nested include)
+  const where = {
+    postId,
+    parentId: null, 
+  };
+
   const [comments, total] = await prisma.$transaction([
     prisma.comment.findMany({
-      where: { postId },
+      where,
       skip,
-      take,
-      orderBy: { createdAt: 'asc' }, // Comment thường sắp xếp từ cũ đến mới
+      take: limit,
+      orderBy: { createdAt: 'desc' },
       include: {
-        author: { // Lấy thông tin người bình luận
-          select: { id: true, fullName: true, avatarUrl: true },
-        },
-        _count: { // Đếm số lượng like
-          select: { commentLikes: true },
+        author: { select: { id: true, fullName: true, avatarUrl: true } },
+        // 🔽 Lấy kèm Replies
+        replies: {
+          orderBy: { createdAt: 'asc' }, // Reply cũ nhất lên trước (giống Facebook)
+          include: {
+            author: { select: { id: true, fullName: true, avatarUrl: true } },
+          },
         },
       },
     }),
-    prisma.comment.count({ where: { postId } }),
+    prisma.comment.count({ where }),
   ]);
 
   const totalPages = Math.ceil(total / limit);
-  return {
-    data: comments,
-    pagination: { totalItems: total, totalPages, currentPage: page, limit },
-  };
+  return { data: comments, pagination: { totalItems: total, totalPages, currentPage: page, limit } };
 };
 
-const createComment = async (postId, userId, content) => {
-  // 1. Kiểm tra Post và Event (lấy ra authorId, eventName)
-  const post = await checkPostAccess(postId);
+const createComment = async (postId, userId, content, parentId = null) => {
+  // 1. Check quyền
+  const post = await verifyPostAccessibility(postId, userId);
 
-  // 2. Tạo comment
+  // 2. Nếu là Reply, kiểm tra comment cha có tồn tại không
+  let parentComment = null;
+  if (parentId) {
+    parentComment = await prisma.comment.findUnique({
+      where: { id: parentId },
+    });
+
+    if (!parentComment) throw createError(404, 'Bình luận gốc không tồn tại');
+    
+    // Validate: Comment cha phải thuộc cùng 1 bài post
+    if (parentComment.postId !== postId) {
+      throw createError(400, 'Bình luận cha không thuộc bài viết này');
+    }
+    
+    // (Tùy chọn) Chặn reply lồng nhau quá sâu (chỉ cho phép 2 cấp: Gốc -> Reply)
+    // Nếu comment cha đã có parentId -> Gán parentId về comment gốc nhất (Flat Reply)
+    if (parentComment.parentId) {
+       parentId = parentComment.parentId; 
+    }
+  }
+
+  // 3. Tạo Comment
   const newComment = await prisma.comment.create({
     data: {
       content,
       postId,
       userId,
+      parentId, // Lưu parentId
     },
     include: {
-      author: {
-        select: { id: true, fullName: true, avatarUrl: true },
-      },
+      author: { select: { id: true, fullName: true, avatarUrl: true } },
     },
   });
 
-  // 3. 🔔 (TÍNH NĂNG NÂNG CAO) Gửi thông báo cho tác giả bài Post
-  // (Chỉ gửi nếu người bình luận không phải là tác giả)
-  if (post.userId && post.userId !== userId) {
+  // 4. Gửi thông báo
+  // TH1: Nếu là Reply -> Báo cho người viết comment gốc
+  if (parentId && parentComment.userId !== userId) {
     notificationService.createNotification(
-      post.userId, // Gửi cho tác giả bài post
-      `"${newComment.author.fullName}" vừa bình luận bài đăng của bạn trong sự kiện "${post.event.name}".`,
-      'POST',
-      postId // Link đến bài post
+      parentComment.userId,
+      `"${newComment.author.fullName}" đã trả lời bình luận của bạn.`,
+      'COMMENT_REPLY',
+      postId // Link về bài post
+    ).catch(console.error);
+  }
+  
+  // TH2: Nếu comment vào bài viết (không phải reply chính mình) -> Báo cho chủ bài viết
+  // (Logic cũ giữ nguyên, nhưng cần check để tránh spam noti nếu chủ bài viết cũng là người comment gốc)
+  if (post.userId !== userId && (!parentId || parentComment.userId !== post.userId)) {
+     notificationService.createNotification(
+      post.userId,
+      `"${newComment.author.fullName}" đã bình luận về bài viết của bạn.`,
+      'POST_COMMENT',
+      postId
     ).catch(console.error);
   }
 
@@ -150,7 +159,7 @@ const toggleCommentLike = async (commentId, userId) => {
 
   // 2. (QUAN TRỌNG) Kiểm tra an toàn
   // Tái sử dụng `checkPostAccess` để đảm bảo sự kiện cha là APPROVED
-  const post = await checkPostAccess(comment.postId);
+  const post = await verifyPostAccessibility(comment.postId, userId);
 
   // 3. Tìm kiếm Like hiện có
   const existingLike = await prisma.commentLike.findUnique({

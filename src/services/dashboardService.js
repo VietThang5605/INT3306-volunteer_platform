@@ -1,4 +1,3 @@
-// src/services/dashboardService.js
 const prisma = require('../prisma/client');
 const createError = require('http-errors');
 
@@ -163,6 +162,28 @@ const getDashboardData = async (user) => {
   }
 };
 
+const getSystemStats = async () => {
+  const [totalUsers, totalEvents, totalPosts] = await prisma.$transaction([
+    // 1. Đếm tổng User (có thể lọc where: { isActive: true } nếu muốn)
+    prisma.user.count(),
+
+    // 2. Đếm tổng Event
+    prisma.event.count(),
+
+    // 3. Đếm tổng Post
+    // Lưu ý: Tùy nghiệp vụ, bạn có thể chỉ đếm bài APPROVED
+    // prisma.post.count({ where: { status: 'APPROVED' } }), 
+    prisma.post.count(), 
+  ]);
+
+  return {
+    totalUsers,
+    totalEvents,
+    totalPosts,
+  };
+};
+
 module.exports = {
   getDashboardData,
+  getSystemStats,
 };

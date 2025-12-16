@@ -19,6 +19,17 @@ const getDashboard = async (req, res, next) => {
   }
 };
 
+const getSystemStats = async (req, res, next) => {
+  try {
+    const stats = await dashboardService.getSystemStats();
+    
+    res.status(200).json(stats);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getDashboard,
+  getSystemStats,
 };

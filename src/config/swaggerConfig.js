@@ -1,5 +1,6 @@
 // src/config/swaggerConfig.js
 const swaggerJSDoc = require('swagger-jsdoc');
+const path = require('path');
 
 const options = {
   // 1. Định nghĩa thông tin cơ bản
@@ -13,8 +14,12 @@ const options = {
     // (Quan trọng) Máy chủ API của bạn
     servers: [
       {
-        url: process.env.API_BASE_URL || 'http://localhost:3000/api/v1',
+        url: process.env.API_BASE_URL || 'http://localhost:3000/api',
         description: 'Development Server',
+      },
+      {
+        url: process.env.PRODUCTION_API_BASE_URL,
+        description: 'Production Server',
       },
     ],
     // (Quan trọng) Định nghĩa bảo mật (Bearer Token)
@@ -36,7 +41,7 @@ const options = {
   },
   // 2. (QUAN TRỌNG) Đường dẫn đến các file chứa JSDoc
   // Swagger sẽ quét các file này để tìm comment
-  apis: ['./src/routes/api/*.js'], // Quét tất cả file router
+  apis: [path.join(__dirname, '../routes/api/*.js')], // Sử dụng path.join để có đường dẫn tuyệt đối
 };
 
 const swaggerSpec = swaggerJSDoc(options);

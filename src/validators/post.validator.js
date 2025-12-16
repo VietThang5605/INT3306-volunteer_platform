@@ -13,6 +13,12 @@ const createPostSchema = Joi.object({
     'string.min': 'Nội dung không được để trống',
     'any.required': 'Nội dung là bắt buộc',
   }),
+  visibility: Joi.string()
+    .valid('PUBLIC', 'PRIVATE')
+    .default('PUBLIC') // Nếu không gửi lên thì mặc định là PUBLIC
+    .messages({
+      'any.only': 'Chế độ hiển thị phải là PUBLIC hoặc PRIVATE',
+    }),
 });
 
 const postIdSchema = Joi.object({
@@ -22,8 +28,19 @@ const postIdSchema = Joi.object({
   }),
 });
 
+const updatePostStatusSchema = Joi.object({
+  status: Joi.string()
+    .valid('APPROVED', 'REJECTED') // Chỉ cho phép 2 trạng thái này
+    .required()
+    .messages({
+      'any.only': 'Trạng thái phải là APPROVED hoặc REJECTED',
+      'any.required': 'Trạng thái là bắt buộc',
+    }),
+});
+
 module.exports = {
   listPostsSchema,
   createPostSchema,
   postIdSchema,
+  updatePostStatusSchema
 };

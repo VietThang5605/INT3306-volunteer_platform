@@ -3,9 +3,11 @@ const postService = require('../services/postService');
 const getPosts = async (req, res, next) => {
   try {
     const { id: eventId } = req.params;
-    const options = req.query; // Đã được Joi validate
-    
-    const result = await postService.listPostsForEvent(eventId, options);
+    const options = req.query;
+    const currentUser = req.user; // 👈 Lấy user hiện tại
+
+    // Truyền user vào service để xử lý logic hiển thị bài Pending
+    const result = await postService.listPostsForEvent(eventId, options, currentUser);
     
     res.status(200).json(result);
   } catch (error) {
@@ -17,11 +19,27 @@ const createPost = async (req, res, next) => {
   try {
     const { id: eventId } = req.params;
     const userId = req.user.id;
-    const { content } = req.body; // Đã được Joi validate
+    
+    const { content, visibility } = req.body; 
+    const files = req.files || []; // Mảng các file
 
-    const newPost = await postService.createPost(eventId, userId, content);
+    const newPost = await postService.createPost(eventId, userId, content, visibility, files);
     
     res.status(201).json(newPost);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const updateStatus = async (req, res, next) => {
+  try {
+    const { id: postId } = req.params;
+    const managerId = req.user.id;
+    const { status } = req.body;
+
+    const result = await postService.updatePostStatus(postId, managerId, status);
+    
+    res.status(200).json(result);
   } catch (error) {
     next(error);
   }
@@ -53,9 +71,37 @@ const togglePostLike = async (req, res, next) => {
     next(error);
   }
 };
+
+const getTrendingGlobal = async (req, res, next) => {
+  try {
+    // Global Trending không cần user context (vì luôn Public), nhưng cứ truyền null cho rõ
+    const result = await postService.getTopInteractedPosts(null, 10, null);
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getTrendingByEvent = async (req, res, next) => {
+  try {
+    const { id: eventId } = req.params;
+    const currentUser = req.user; // 👈 Lấy user hiện tại từ token
+
+    // Truyền currentUser vào để service check quyền
+    const result = await postService.getTopInteractedPosts(eventId, 5, currentUser);
+    
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getPosts,
   createPost,
   deletePost,
   togglePostLike,
+  updateStatus,
+  getTrendingGlobal,
+  getTrendingByEvent,
 };

@@ -3,7 +3,7 @@ const router = express.Router();
 
 const { auth } = require('../../middlewares/auth');
 const validate = require('../../middlewares/validate');
-const { postIdSchema } = require('../../validators/post.validator');
+const { postIdSchema, updatePostStatusSchema } = require('../../validators/post.validator');
 const postController = require('../../controllers/postController');
 const {
   listCommentsSchema,
@@ -188,6 +188,18 @@ router.post(
   validate(postIdSchema, 'params'), // 1. Validate ID post
   validate(createCommentSchema),   // 2. Validate body
   commentController.createComment
+);
+
+router.post(
+  '/:id/status',
+  validate(postIdSchema, 'params'),     // Validate ID
+  validate(updatePostStatusSchema),     // Validate Body (APPROVED/REJECTED)
+  postController.updateStatus
+);
+
+router.get(
+  '/trending',
+  postController.getTrendingGlobal
 );
 
 module.exports = router;

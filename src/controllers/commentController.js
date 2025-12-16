@@ -1,36 +1,28 @@
 // src/controllers/commentController.js
 const commentService = require('../services/commentService');
 
-/**
- * @desc    Lấy danh sách bình luận của 1 bài post
- * @route   GET /api/v1/posts/:id/comments
- * @access  Authenticated
- */
 const getComments = async (req, res, next) => {
   try {
     const { id: postId } = req.params;
     const options = req.query; // Đã được Joi validate
-    
-    const result = await commentService.listCommentsForPost(postId, options);
-    
+    const userId = req.user.id;
+
+    const result = await commentService.listCommentsForPost(postId, options, userId);
+
     res.status(200).json(result);
   } catch (error) {
     next(error);
   }
 };
 
-/**
- * @desc    Tạo bình luận mới
- * @route   POST /api/v1/posts/:id/comments
- * @access  Authenticated
- */
 const createComment = async (req, res, next) => {
   try {
     const { id: postId } = req.params;
     const userId = req.user.id;
-    const { content } = req.body; // Đã được Joi validate
+    // 🔽 Lấy thêm parentId
+    const { content, parentId } = req.body;
 
-    const newComment = await commentService.createComment(postId, userId, content);
+    const newComment = await commentService.createComment(postId, userId, content, parentId);
     
     res.status(201).json(newComment);
   } catch (error) {
