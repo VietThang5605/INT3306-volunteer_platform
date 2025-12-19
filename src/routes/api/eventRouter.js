@@ -18,6 +18,17 @@ const registrationController = require('../../controllers/registrationController
  *   description: Quản lý sự kiện và các hoạt động liên quan (đăng ký, bài viết)
  */
 
+
+
+router.get(
+  '/me',
+  auth, // 1. Phải đăng nhập
+  permit('MANAGER'), // 2. (Tùy chọn) Nếu muốn chặn Volunteer gọi API này thì uncomment
+  validate(listEventsSchema, 'query'), // 3. Validate phân trang (page, limit...)
+  eventController.getMyEvents
+);
+
+
 /**
  * @swagger
  * /events:
@@ -408,7 +419,7 @@ router.get(
  *     requestBody:
  *       required: true
  *       content:
-         application/json:
+ *         application/json:
  *           schema:
  *             $ref: '#/components/schemas/NewPost'
  *     responses:
@@ -443,12 +454,6 @@ router.get(
   postController.getTrendingByEvent
 );
 
-router.get(
-  '/me',
-  auth, // 1. Phải đăng nhập
-  permit('MANAGER'), // 2. (Tùy chọn) Nếu muốn chặn Volunteer gọi API này thì uncomment
-  validate(listEventsSchema, 'query'), // 3. Validate phân trang (page, limit...)
-  eventController.getMyEvents
-);
+
 
 module.exports = router;
