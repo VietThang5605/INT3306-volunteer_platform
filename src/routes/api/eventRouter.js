@@ -156,7 +156,8 @@ router.post(
   '/',
   auth, 
   permit('MANAGER'), 
-  validate(createEventSchema),
+  upload.single('cover'), // 1. Parse Multipart (Ảnh + Data)
+  validate(createEventSchema), // 2. Validate Data (req.body đã có dữ liệu)
   eventController.createEvent 
 );
 

@@ -31,6 +31,15 @@ const createEvent = async (req, res, next) => {
     
     // 2. Lấy dữ liệu sự kiện từ body (đã được Joi validate)
     const eventData = req.body;
+    
+    // 3. Xử lý ảnh bìa (nếu có)
+    if (req.file) {
+      // Multer Cloudinary lưu URL vào `path` hoặc `secure_url`
+      eventData.coverUrl = req.file.path || req.file.secure_url;
+    }
+    
+    // Xóa trường 'cover' (dư thừa từ frontend) để tránh lỗi Prisma
+    delete eventData.cover;
 
     const newEvent = await eventService.createEvent(eventData, managerId);
     

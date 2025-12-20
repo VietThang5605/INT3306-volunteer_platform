@@ -48,6 +48,7 @@ const createEventSchema = Joi.object({
 
   categoryId: Joi.number().integer().min(1).optional().allow(null),
   capacity: Joi.number().integer().min(1).optional().allow(null),
+  cover: Joi.any().optional(),
   
   // Bất kỳ trường nào khác (như status, managerId) sẽ tự động bị Joi lọc bỏ
 });
