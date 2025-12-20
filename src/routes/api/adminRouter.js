@@ -197,4 +197,10 @@ router.get(
   adminController.getEventDetail
 );
 
+router.get(
+  '/dashboard',
+  // Không cần validate param/query gì đặc biệt
+  adminController.getDashboardStats
+);
+
 module.exports = router;

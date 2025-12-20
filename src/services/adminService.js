@@ -287,10 +287,58 @@ const deleteEventByAdmin = async (eventId) => {
   return; // Hoàn thành
 };
 
+const getDashboardStats = async () => {
+  const [
+    totalUsers,
+    totalVolunteers,
+    totalManagers,
+    totalAdmins,
+    totalEvents,
+    pendingEvents,
+    approvedEvents,
+    completedEvents,
+    totalCategories
+  ] = await prisma.$transaction([
+    // User Stats
+    prisma.user.count(),
+    prisma.user.count({ where: { role: 'VOLUNTEER' } }),
+    prisma.user.count({ where: { role: 'MANAGER' } }),
+    prisma.user.count({ where: { role: 'ADMIN' } }),
+    
+    // Event Stats
+    prisma.event.count(),
+    prisma.event.count({ where: { status: 'PENDING' } }),
+    prisma.event.count({ where: { status: 'APPROVED' } }),
+    prisma.event.count({ where: { status: 'COMPLETED' } }),
+    
+    // Category Stats
+    prisma.category.count(),
+  ]);
+
+  return {
+    users: {
+      total: totalUsers,
+      volunteers: totalVolunteers,
+      managers: totalManagers,
+      admins: totalAdmins,
+    },
+    events: {
+      total: totalEvents,
+      pending: pendingEvents,
+      approved: approvedEvents,
+      completed: completedEvents,
+    },
+    categories: {
+      total: totalCategories,
+    }
+  };
+};
+
 module.exports = {
   approveEvent,
   exportEvents,
   exportUsers,
   deleteEventByAdmin,
-  getEventDetail
+  getEventDetail,
+  getDashboardStats
 };

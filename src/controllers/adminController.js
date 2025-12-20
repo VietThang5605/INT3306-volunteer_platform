@@ -85,10 +85,20 @@ const deleteEvent = async (req, res, next) => {
   }
 };
 
+const getDashboardStats = async (req, res, next) => {
+  try {
+    const stats = await adminService.getDashboardStats();
+    res.status(200).json(stats);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   approveEvent,
   exportEvents,
   exportUsers,
   deleteEvent,
   getEventDetail,
+  getDashboardStats,
 };
