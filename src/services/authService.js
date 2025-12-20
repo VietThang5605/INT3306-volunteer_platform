@@ -7,27 +7,29 @@ const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/emai
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const ACCESS_TOKEN_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
-const REFRESH_TOKEN_EXPIRES_DAYS = parseInt(process.env.REFRESH_TOKEN_EXPIRES_DAYS || '7', 10);
+const REFRESH_TOKEN_EXPIRES_DAYS = parseInt(process.env.REFRESH_TOKEN_EXPIRES_DAYS || '30', 10);
 
 function signAccessToken(user) {
   const payload = { sub: user.id, role: user.role };
   return jwt.sign(payload, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRES_IN });
 }
 
-const generateRefreshToken = async (userId, device, ip) => {
+const generateRefreshToken = async (userId, device, ip, rememberMe = true) => {
   // 1. Tạo token thô
-  const rawToken = genToken(); // Ví dụ: "abc123_RAW"
+  const rawToken = genToken();
 
   // 2. Băm token
-  const hashedToken = hashToken(rawToken); // Ví dụ: "xyz789_HASHED"
+  const hashedToken = hashToken(rawToken);
 
-  // 3. Đặt ngày hết hạn (ví dụ: 7 ngày)
-  const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60 * 1000);
+  // 3. Đặt ngày hết hạn dựa vào rememberMe
+  // rememberMe = true → 30 ngày, false → 1 ngày
+  const expiryDays = rememberMe ? REFRESH_TOKEN_EXPIRES_DAYS : 1;
+  const expiresAt = new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000);
 
   // 4. Lưu HASH vào CSDL
   await prisma.refreshToken.create({
     data: {
-      token: hashedToken, // Lưu HASH
+      token: hashedToken,
       userId: userId,
       expiresAt: expiresAt,
       device: device || 'null',
@@ -35,8 +37,8 @@ const generateRefreshToken = async (userId, device, ip) => {
     },
   });
 
-  // 5. Trả về token THÔ (để đặt cookie)
-  return rawToken; // Trả về token thô
+  // 5. Trả về token THÔ và số ngày hết hạn
+  return { rawToken, expiryDays };
 };
 
 const generateVerificationToken = async userId => {
@@ -136,12 +138,21 @@ const verifyEmail = async rawTokenString => {
   return; // Hoàn thành
 };
 
-const loginUser = async ({ email, password, device, ip }) => {
+const loginUser = async ({ email, password, device, ip, rememberMe = true }) => {
   const user = await prisma.user.findUnique({ where: { email } });
+
+  if (!user) {
+    throw createError.Unauthorized('Invalid email or password');
+  }
+
+  // Nếu user đăng ký bằng Google và không có password
+  if (!user.passwordHash) {
+    throw createError.Unauthorized('Tài khoản này được đăng ký bằng Google. Vui lòng đăng nhập bằng Google.');
+  }
 
   const passwordValid = await argon2.verify(user.passwordHash, password);
 
-  if (!user || !passwordValid) {
+  if (!passwordValid) {
     throw createError.Unauthorized('Invalid email or password');
   }
 
@@ -153,11 +164,11 @@ const loginUser = async ({ email, password, device, ip }) => {
     throw createError.Forbidden('User account is deactivated');
   }
 
-  const rawToken = await generateRefreshToken(user.id, device, ip);
+  const { rawToken, expiryDays } = await generateRefreshToken(user.id, device, ip, rememberMe);
 
   const accessToken = signAccessToken(user);
 
-  return { user, accessToken, refreshToken: rawToken };
+  return { user, accessToken, refreshToken: rawToken, expiryDays };
 };
 
 const logoutUser = async (tokenString, userId) => {
@@ -222,13 +233,24 @@ const rotateRefreshToken = async rawTokenString => {
     throw createError(401, 'Không tìm thấy người dùng hoặc tài khoản đã bị khóa');
   }
 
-  // 6. Tạo cặp MỚI
+  // 6. Tính số ngày còn lại của token cũ để giữ nguyên thời hạn
+  const remainingMs = tokenInDb.expiresAt.getTime() - Date.now();
+  const remainingDays = Math.max(1, Math.ceil(remainingMs / (24 * 60 * 60 * 1000)));
+  const rememberMe = remainingDays > 1; // Nếu còn > 1 ngày thì là rememberMe
+
+  // 7. Tạo cặp MỚI (giữ nguyên rememberMe setting)
   const newAccessToken = signAccessToken(user);
-  const newRawRefreshToken = await generateRefreshToken(user.id); // Hàm này sẽ tự tạo hash mới
+  const { rawToken: newRawRefreshToken, expiryDays } = await generateRefreshToken(
+    user.id,
+    null,
+    null,
+    rememberMe,
+  );
 
   return {
     accessToken: newAccessToken,
-    rawRefreshToken: newRawRefreshToken, //  Trả về token THÔ mới
+    rawRefreshToken: newRawRefreshToken,
+    expiryDays,
   };
 };
 
@@ -270,18 +292,30 @@ const changePassword = async (userId, oldPassword, newPassword) => {
 };
 
 const getUserProfile = async userId => {
+  console.log('=== GET PROFILE DEBUG ===');
+  console.log('Fetching profile for userId:', userId);
+  
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
       id: true,
       fullName: true,
       email: true,
+      avatarUrl: true,
+      bio: true,
+      phoneNumber: true,
+      location: true,
+      dob: true,
       role: true,
       isActive: true,
+      isEmailVerified: true,
       createdAt: true,
       updatedAt: true,
     },
   });
+
+  console.log('Returned avatarUrl from DB:', user?.avatarUrl);
+  console.log('=== END GET PROFILE DEBUG ===');
 
   if (!user) {
     throw createError(404, 'Không tìm thấy người dùng');
@@ -415,4 +449,6 @@ module.exports = {
   verifyEmail,
   requestPasswordReset,
   performPasswordReset,
+  signAccessToken,
+  generateRefreshToken,
 };

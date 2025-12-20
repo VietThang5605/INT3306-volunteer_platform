@@ -3,7 +3,7 @@ const router = express.Router();
 
 const { auth, permit } = require('../../middlewares/auth');
 const validate = require('../../middlewares/validate');
-const { listEventsSchema, listManagerEventsSchema, eventIdSchema, createEventSchema, updateEventSchema } = require('../../validators/event.validator');
+const { listEventsSchema, eventIdSchema, createEventSchema, updateEventSchema } = require('../../validators/event.validator');
 const { listRegistrationsSchema } = require('../../validators/registration.validator');
 const { listPostsSchema } = require('../../validators/post.validator');
 const upload = require('../../config/cloudinary');
@@ -17,25 +17,6 @@ const registrationController = require('../../controllers/registrationController
  *   name: Events
  *   description: Quản lý sự kiện và các hoạt động liên quan (đăng ký, bài viết)
  */
-
-
-
-router.get(
-  '/admin',
-  auth, // 1. Phải đăng nhập
-  permit('ADMIN'), // 2. Phải là Admin
-  validate(listManagerEventsSchema, 'query'), // 3. Validate phân trang/lọc (như Manager)
-  eventController.getAllEvents // 4. Controller mới
-);
-
-router.get(
-  '/manager',
-  auth, // 1. Phải đăng nhập
-  permit('MANAGER'), // 2. (Tùy chọn) Nếu muốn chặn Volunteer gọi API này thì uncomment
-  validate(listManagerEventsSchema, 'query'), // 3. Validate phân trang (page, limit...) & status
-  eventController.getMyEvents
-);
-
 
 /**
  * @swagger
@@ -104,6 +85,90 @@ router.get(
 
 /**
  * @swagger
+ * /events/me:
+ *   get:
+ *     summary: (Manager) Lấy danh sách sự kiện của tôi
+ *     tags: [Events]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Số trang
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Số lượng kết quả mỗi trang
+ *     responses:
+ *       "200":
+ *         description: Danh sách sự kiện của tôi
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Event'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/Pagination'
+ *       "401":
+ *         description: Chưa xác thực
+ *       "403":
+ *         description: Không có quyền (không phải Manager)
+ */
+router.get(
+  '/me',
+  auth,
+  permit('MANAGER'),
+  validate(listEventsSchema, 'query'),
+  eventController.getMyEvents
+);
+
+/**
+ * @swagger
+ * /events/{id}/members:
+ *   get:
+ *     summary: Lấy danh sách thành viên (người tham gia đã CONFIRMED) của sự kiện
+ *     tags: [Events]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         required: true
+ *         description: ID của sự kiện
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *     responses:
+ *       "200":
+ *         description: Danh sách thành viên
+ *       "404":
+ *         description: Không tìm thấy sự kiện
+ */
+router.get(
+  '/:id/members',
+  validate(eventIdSchema, 'params'),
+  eventController.getEventMembers
+);
+
+/**
+ * @swagger
  * /events/{id}:
  *   get:
  *     summary: Lấy thông tin chi tiết một sự kiện công khai
@@ -164,8 +229,7 @@ router.post(
   '/',
   auth, 
   permit('MANAGER'), 
-  upload.single('cover'), // 1. Parse Multipart (Ảnh + Data)
-  validate(createEventSchema), // 2. Validate Data (req.body đã có dữ liệu)
+  validate(createEventSchema),
   eventController.createEvent 
 );
 
@@ -417,14 +481,6 @@ router.get(
  *     tags: [Events, Posts]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         schema:
- *           type: string
- *           format: uuid
- *         required: true
- *         description: ID của sự kiện
  *     requestBody:
  *       required: true
  *       content:
@@ -462,7 +518,5 @@ router.get(
   validate(eventIdSchema, 'params'), // Validate ID sự kiện
   postController.getTrendingByEvent
 );
-
-
 
 module.exports = router;

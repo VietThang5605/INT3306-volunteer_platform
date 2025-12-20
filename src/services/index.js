@@ -9,6 +9,7 @@ const categoryService = require('../services/categoryService');
 const postService = require('../services/postService');
 const commentService = require('../services/commentService');
 const dashboardService = require('../services/dashboardService');
+const webPushService = require('../services/webPushService');
 
 module.exports = {
     authService,
@@ -21,5 +22,6 @@ module.exports = {
     categoryService,
     postService,
     commentService,
-    dashboardService
+    dashboardService,
+    webPushService
 };

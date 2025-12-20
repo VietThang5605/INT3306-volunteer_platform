@@ -76,6 +76,7 @@ model User {
   refreshTokens       RefreshToken[]
   verificationTokens  VerificationToken[]
   passwordResetTokens PasswordResetToken[]
+  pushSubscriptions   PushSubscription[]
 }
 
 model Category {
@@ -146,11 +147,11 @@ model Post {
 }
 
 model PostMedia {
-  id        String   @id @default(uuid())
+  id        String   @id @default(uuid()) @db.Uuid
   url       String
   type      String
   
-  postId    String
+  postId    String   @db.Uuid
   post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
 }
 
@@ -238,4 +239,18 @@ model PasswordResetToken {
   expiresAt DateTime @db.Timestamptz
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PushSubscription {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  endpoint  String   @unique
+  p256dh    String   // Public key
+  auth      String   // Auth secret
+  userAgent String?  // Browser/device info
+  createdAt DateTime @default(now()) @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

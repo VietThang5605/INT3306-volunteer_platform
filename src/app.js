@@ -6,7 +6,7 @@ const cookieParser = require('cookie-parser');
 const createError = require('http-errors');
 const apiRoutes = require('./routes/api'); // File index của routes
 const errorHandler = require('./middlewares/errorHandler'); // 👈 1. Import
-const { generalLimiter } = require('./middlewares/rateLimiter');
+
 const swaggerUi = require('swagger-ui-express'); // 👈 Import
 const swaggerSpec = require('./config/swaggerConfig'); // 👈 Import
 
@@ -19,7 +19,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser()); // Đọc cookie
 app.use(morgan('dev')); // Log request (dev/combined)
 
-app.use('/api/', generalLimiter, apiRoutes);
+app.use('/api/', apiRoutes);
 
 app.use(
   '/api-docs', // Endpoint bạn muốn

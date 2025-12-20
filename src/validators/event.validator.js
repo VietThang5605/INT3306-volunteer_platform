@@ -17,11 +17,6 @@ const listEventsSchema = Joi.object({
   order: Joi.string().valid('asc', 'desc').default('desc'),
 });
 
-const listManagerEventsSchema = listEventsSchema.keys({
-  status: Joi.string().valid('DRAFT', 'PENDING', 'APPROVED', 'CANCELLED', 'COMPLETED').optional(),
-  search: Joi.string().optional().allow(''),
-});
-
 const eventIdSchema = Joi.object({
   id: Joi.string().uuid().required().messages({
     'string.guid': 'ID sự kiện phải là một UUID hợp lệ',
@@ -53,7 +48,6 @@ const createEventSchema = Joi.object({
 
   categoryId: Joi.number().integer().min(1).optional().allow(null),
   capacity: Joi.number().integer().min(1).optional().allow(null),
-  cover: Joi.any().optional(),
   
   // Bất kỳ trường nào khác (như status, managerId) sẽ tự động bị Joi lọc bỏ
 });
@@ -81,7 +75,6 @@ const updateEventSchema = Joi.object({
 
 module.exports = {
   listEventsSchema,
-  listManagerEventsSchema,
   eventIdSchema,
   createEventSchema,
   updateEventSchema,

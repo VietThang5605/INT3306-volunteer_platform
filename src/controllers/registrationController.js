@@ -85,10 +85,24 @@ const updateRegistrationStatus = async (req, res, next) => {
   }
 };
 
+const getMyChannels = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const options = req.query;
+
+    const result = await registrationService.getMyChannels(userId, options);
+
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getRegistrations,
   createRegistration,
   deleteRegistration,
   getRegistrationsForEvent,
   updateRegistrationStatus,
+  getMyChannels,
 };

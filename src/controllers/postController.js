@@ -23,6 +23,15 @@ const createPost = async (req, res, next) => {
     const { content, visibility } = req.body; 
     const files = req.files || []; // Mảng các file
 
+    // Debug log
+    console.log('=== CREATE POST DEBUG ===');
+    console.log('req.files:', req.files);
+    console.log('files length:', files.length);
+    if (files.length > 0) {
+      console.log('First file:', files[0]);
+    }
+    console.log('=== END DEBUG ===');
+
     const newPost = await postService.createPost(eventId, userId, content, visibility, files);
     
     res.status(201).json(newPost);

@@ -46,10 +46,6 @@ const listPublicEvents = async (options) => {
         manager: {
           select: { id: true, fullName: true, avatarUrl: true },
         },
-        registrations: {
-          where: { status: 'CONFIRMED' },
-          select: { id: true },
-        },
       },
     }),
     prisma.event.count({ where }),
@@ -58,17 +54,8 @@ const listPublicEvents = async (options) => {
   // 6. Tính toán thông tin phân trang
   const totalPages = Math.ceil(total / limit);
 
-  // 7. Map data để thêm participantCount
-  const data = events.map(event => {
-    const { registrations, ...rest } = event;
-    return {
-      ...rest,
-      participantCount: registrations.length,
-    };
-  });
-
   return {
-    data: data,
+    data: events,
     pagination: {
       totalItems: total,
       totalPages,
@@ -88,10 +75,6 @@ const getPublicEventById = async (eventId) => {
       manager: {
         select: { id: true, fullName: true, avatarUrl: true }, // Thông tin an toàn
       },
-      registrations: {
-        where: { status: 'CONFIRMED' },
-        select: { id: true },
-      },
     },
   });
 
@@ -99,12 +82,7 @@ const getPublicEventById = async (eventId) => {
     throw createError(404, 'Không tìm thấy sự kiện');
   }
 
-  // Tính toán số lượng participant
-  const { registrations, ...rest } = event;
-  return {
-    ...rest,
-    participantCount: registrations.length,
-  };
+  return event;
 };
 
 const createEvent = async (eventData, managerId) => {
@@ -203,70 +181,6 @@ const deleteEvent = async (eventId, managerId) => {
   return; // Hoàn thành
 };
 
-const getAllEventsForAdmin = async (options) => {
-  const page = parseInt(options.page, 10) || 1;
-  const limit = parseInt(options.limit, 10) || 10;
-  const skip = (page - 1) * limit;
-
-  // 1. Xử lý phần Lọc (Filter)
-  const where = {};
-
-  // Lọc theo trạng thái
-  if (options.status) {
-    where.status = options.status;
-  }
-
-  // Tìm kiếm theo tên
-  if (options.search) {
-    where.name = {
-      contains: options.search,
-      mode: 'insensitive',
-    };
-  }
-
-  // 2. Query Database
-  const [events, total] = await prisma.$transaction([
-    prisma.event.findMany({
-      where,
-      skip,
-      take: limit,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        category: true,
-        manager: {
-          select: { id: true, fullName: true, email: true, avatarUrl: true }, // Admin cần xem chi tiết manager
-        },
-        registrations: {
-          where: { status: 'CONFIRMED' },
-          select: { id: true },
-        },
-      },
-    }),
-    prisma.event.count({ where }),
-  ]);
-
-  const totalPages = Math.ceil(total / limit);
-
-  // Map data
-  const data = events.map(event => {
-    const { registrations, ...rest } = event;
-    return {
-      ...rest,
-      participantCount: registrations.length,
-    };
-  });
-
-  return {
-    data: data,
-    pagination: {
-      totalItems: total,
-      totalPages,
-      currentPage: page,
-      limit,
-    },
-  };
-};
-
 const getEventsByManager = async (managerId, options) => {
   const page = parseInt(options.page, 10) || 1;
   const limit = parseInt(options.limit, 10) || 10;
@@ -296,12 +210,23 @@ const getEventsByManager = async (managerId, options) => {
       where,
       skip,
       take: limit,
-      orderBy: { createdAt: 'desc' }, // Sự kiện mới tạo lên đầu
+      orderBy: { createdAt: 'desc' },
       include: {
-        category: true, // Lấy kèm thông tin danh mục
-        registrations: {
-          where: { status: 'CONFIRMED' },
-          select: { id: true },
+        category: true,
+        _count: {
+          select: {
+            registrations: true,
+            posts: true, // Đếm số bài viết
+          },
+        },
+        // Lấy bài post mới nhất
+        posts: {
+          take: 1,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            createdAt: true,
+          },
         },
       },
     }),
@@ -310,20 +235,75 @@ const getEventsByManager = async (managerId, options) => {
 
   const totalPages = Math.ceil(total / limit);
 
-  // Map data
-  const data = events.map(event => {
-    const { registrations, ...rest } = event;
-    return {
-      ...rest,
-      participantCount: registrations.length,
-    };
-  });
-
   return {
-    data: data,
+    data: events,
     pagination: {
       totalItems: total,
       totalPages,
+      currentPage: page,
+      limit,
+    },
+  };
+};
+
+/**
+ * Lấy danh sách members (người tham gia đã CONFIRMED) của sự kiện
+ */
+const getEventMembers = async (eventId, options) => {
+  const page = parseInt(options.page, 10) || 1;
+  const limit = parseInt(options.limit, 10) || 10;
+  const skip = (page - 1) * limit;
+
+  // Kiểm tra sự kiện tồn tại
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { id: true, status: true },
+  });
+
+  if (!event) {
+    throw createError(404, 'Không tìm thấy sự kiện');
+  }
+
+  const where = {
+    eventId: eventId,
+    status: 'CONFIRMED',
+  };
+
+  const [registrations, total] = await prisma.$transaction([
+    prisma.eventRegistration.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { registeredAt: 'asc' },
+      select: {
+        id: true,
+        registeredAt: true,
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    }),
+    prisma.eventRegistration.count({ where }),
+  ]);
+
+  // Format lại để trả về danh sách user
+  const members = registrations.map((reg) => ({
+    id: reg.user.id,
+    fullName: reg.user.fullName,
+    avatarUrl: reg.user.avatarUrl,
+    joinedAt: reg.registeredAt,
+  }));
+
+  return {
+    data: members,
+    totalMembers: total,
+    pagination: {
+      totalItems: total,
+      totalPages: Math.ceil(total / limit),
       currentPage: page,
       limit,
     },
@@ -337,5 +317,5 @@ module.exports = {
   updateEvent,
   deleteEvent,
   getEventsByManager,
-  getAllEventsForAdmin,
+  getEventMembers,
 };

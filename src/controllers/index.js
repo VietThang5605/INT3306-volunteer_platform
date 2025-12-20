@@ -9,6 +9,7 @@ const postController = require('./postController');
 const commentController = require('./commentController');
 const dashboardController = require('./dashboardController');
 const notificationController = require('./notificationController');
+const pushController = require('./pushController');
 
 module.exports = {
     authController,
@@ -22,4 +23,5 @@ module.exports = {
     commentController,
     dashboardController,
     notificationController,
+    pushController,
 };
