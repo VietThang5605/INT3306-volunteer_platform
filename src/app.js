@@ -11,7 +11,7 @@ const swaggerUi = require('swagger-ui-express'); // 👈 Import
 const swaggerSpec = require('./config/swaggerConfig'); // 👈 Import
 
 const app = express();
-app.use
+
 app.use(helmet()); // Bảo mật headers
 app.use(cors(/* Cấu hình cors tại đây */));
 app.use(express.json()); // Thay thế body-parser

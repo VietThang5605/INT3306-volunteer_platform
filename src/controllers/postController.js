@@ -21,16 +21,7 @@ const createPost = async (req, res, next) => {
     const userId = req.user.id;
     
     const { content, visibility } = req.body; 
-    const files = req.files || []; // Mảng các file
-
-    // Debug log
-    console.log('=== CREATE POST DEBUG ===');
-    console.log('req.files:', req.files);
-    console.log('files length:', files.length);
-    if (files.length > 0) {
-      console.log('First file:', files[0]);
-    }
-    console.log('=== END DEBUG ===');
+    const files = req.files || [];
 
     const newPost = await postService.createPost(eventId, userId, content, visibility, files);
     
@@ -83,7 +74,6 @@ const togglePostLike = async (req, res, next) => {
 
 const getTrendingGlobal = async (req, res, next) => {
   try {
-    // Global Trending không cần user context (vì luôn Public), nhưng cứ truyền null cho rõ
     const result = await postService.getTopInteractedPosts(null, 10, null);
     res.status(200).json(result);
   } catch (error) {
@@ -94,10 +84,9 @@ const getTrendingGlobal = async (req, res, next) => {
 const getTrendingByEvent = async (req, res, next) => {
   try {
     const { id: eventId } = req.params;
-    const currentUser = req.user; // 👈 Lấy user hiện tại từ token
+    const currentUser = req.user;
 
-    // Truyền currentUser vào để service check quyền
-    const result = await postService.getTopInteractedPosts(eventId, 5, currentUser);
+    const result = await postService.getTopInteractedPosts(eventId, 10, currentUser);
     
     res.status(200).json(result);
   } catch (error) {

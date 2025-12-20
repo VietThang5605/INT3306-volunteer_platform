@@ -293,42 +293,28 @@ router.post(
   '/me/avatar',
   auth,
   (req, res, next) => {
-    console.log('=== UPLOAD MIDDLEWARE DEBUG ===');
-    console.log('Content-Type:', req.headers['content-type']);
-    
     upload.single('avatar')(req, res, (err) => {
       if (err) {
-        console.error('Multer/Cloudinary upload error:', err);
         return next(createError(500, `Upload failed: ${err.message}`));
       }
-      console.log('req.file after multer:', req.file);
-      console.log('=== END UPLOAD MIDDLEWARE DEBUG ===');
       next();
     });
   },
   async (req, res, next) => {
     try {
-      // Cloudinary trả về url/secure_url, không phải path
       const avatarUrl = req.file?.secure_url || req.file?.url || req.file?.path;
       
-      if (!req.file || !avatarUrl) throw createError(400, 'Không nhận được file ảnh hợp lệ');
+      if (!req.file || !avatarUrl) {
+        throw createError(400, 'Không nhận được file ảnh hợp lệ');
+      }
       
-      console.log('=== AVATAR UPDATE DEBUG ===');
-      console.log('User ID:', req.user.id);
-      console.log('New Avatar URL:', avatarUrl);
-      
-      // Update vào DB
-      const updatedUser = await prisma.user.update({
+      await prisma.user.update({
         where: { id: req.user.id },
-        data: { avatarUrl: avatarUrl },
+        data: { avatarUrl },
       });
-
-      console.log('Updated user avatarUrl in DB:', updatedUser.avatarUrl);
-      console.log('=== END DEBUG ===');
 
       res.status(200).json({ message: 'Cập nhật avatar thành công', url: avatarUrl });
     } catch (error) {
-      console.error('Avatar update error:', error);
       next(error);
     }
   }

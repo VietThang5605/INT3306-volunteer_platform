@@ -1,7 +1,7 @@
 const prisma = require('../prisma/client');
 const createError = require('http-errors');
 const notificationService = require('./notificationService'); // Import để thông báo
-const { emitToPost, emitToEvent } = require('../socket');
+const { emitToPost, emitToEvent, emitToUser } = require('../socket');
 
 const checkEventAccess = async eventId => {
   const event = await prisma.event.findUnique({
@@ -75,13 +75,27 @@ const listPostsForEvent = async (eventId, options, currentUser) => {
         author: { select: { id: true, fullName: true, avatarUrl: true } },
         medias: true,
         _count: { select: { comments: true, postLikes: true } },
+        // Check xem user hiện tại đã like chưa
+        postLikes: {
+          where: { userId: currentUser.id },
+          select: { id: true },
+        },
       },
     }),
     prisma.post.count({ where }),
   ]);
 
+  // Map để thêm isLikedByCurrentUser và loại bỏ postLikes array thừa
+  const postsWithLikeStatus = posts.map(post => {
+    const { postLikes, ...rest } = post;
+    return {
+      ...rest,
+      isLikedByCurrentUser: postLikes.length > 0,
+    };
+  });
+
   const totalPages = Math.ceil(total / limit);
-  return { data: posts, pagination: { totalItems: total, totalPages, currentPage: page, limit } };
+  return { data: postsWithLikeStatus, pagination: { totalItems: total, totalPages, currentPage: page, limit } };
 };
 
 const createPost = async (eventId, userId, content, visibility = 'PUBLIC', mediaFiles = []) => {
@@ -130,12 +144,21 @@ const createPost = async (eventId, userId, content, visibility = 'PUBLIC', media
 
   // 5. Gửi thông báo (Nếu là Volunteer đăng bài -> Báo cho Manager)
   if (!isManager) {
+    // Gửi notification DB
     notificationService.createNotification(
       event.managerId,
       `"${newPost.author.fullName}" vừa đăng bài viết mới cần duyệt trong sự kiện "${event.name}".`,
       'POST', // Loại thông báo: Liên quan đến bài viết
       newPost.id
-    ).catch(console.error); // Fire-and-forget (không chờ, không crash nếu lỗi gửi thông báo)
+    ).catch(console.error);
+
+    // Emit socket realtime cho Manager thấy ngay
+    emitToUser(event.managerId, 'new_pending_post', {
+      post: newPost,
+      eventId,
+      eventName: event.name,
+      message: `"${newPost.author.fullName}" vừa đăng bài viết mới cần duyệt`,
+    });
   }
 
   // 6. Emit socket nếu bài đã được duyệt (Manager đăng)
@@ -153,6 +176,7 @@ const updatePostStatus = async (postId, managerId, status) => {
     select: {
       id: true,
       userId: true, // Tác giả bài viết
+      eventId: true, // Cần eventId để emit socket
       event: {
         select: { managerId: true, name: true },
       },
@@ -166,10 +190,15 @@ const updatePostStatus = async (postId, managerId, status) => {
     throw createError(403, 'Bạn không có quyền duyệt bài viết này');
   }
 
-  // 3. Cập nhật
+  // 3. Cập nhật và lấy đầy đủ thông tin post
   const updatedPost = await prisma.post.update({
     where: { id: postId },
     data: { status },
+    include: {
+      author: { select: { id: true, fullName: true, avatarUrl: true } },
+      medias: true,
+      _count: { select: { comments: true, postLikes: true } },
+    },
   });
 
   // 4. Gửi thông báo cho tác giả bài viết
@@ -182,6 +211,16 @@ const updatePostStatus = async (postId, managerId, status) => {
         post.id,
       )
       .catch(console.error);
+
+    // Emit socket: bài mới được duyệt -> hiển thị cho tất cả user trong event
+    emitToEvent(post.eventId, 'new_post', { post: updatedPost });
+
+    // Emit cho tác giả biết bài đã được duyệt
+    emitToUser(post.userId, 'post_approved', {
+      postId,
+      eventName: post.event.name,
+      message: 'Bài viết của bạn đã được duyệt!',
+    });
   } else if (status === 'REJECTED') {
     notificationService
       .createNotification(
@@ -191,6 +230,13 @@ const updatePostStatus = async (postId, managerId, status) => {
         null,
       )
       .catch(console.error);
+
+    // Emit cho tác giả biết bài bị từ chối
+    emitToUser(post.userId, 'post_rejected', {
+      postId,
+      eventName: post.event.name,
+      message: 'Bài viết của bạn đã bị từ chối.',
+    });
   }
 
   return updatedPost;
@@ -202,6 +248,7 @@ const deletePost = async (postId, user) => {
     where: { id: postId },
     select: {
       userId: true, // ID của Tác giả (Author)
+      eventId: true, // Cần eventId để emit socket
       event: {
         select: {
           managerId: true, // ID của Manager
@@ -228,6 +275,9 @@ const deletePost = async (postId, user) => {
   await prisma.post.delete({
     where: { id: postId },
   });
+
+  // 4. Emit socket realtime để các user khác thấy bài đã bị xóa
+  emitToEvent(post.eventId, 'delete_post', { postId });
 
   return; // Hoàn thành
 };
@@ -360,7 +410,7 @@ const getTopInteractedPosts = async (eventId = null, limit = 5, currentUser = nu
     // Nếu có quyền (canViewPrivate = true) -> Không gán where.visibility -> Lấy cả 2
   }
 
-  // 2. Truy vấn (Giữ nguyên)
+  // 2. Truy vấn
   const posts = await prisma.post.findMany({
     where,
     take: limit,
@@ -375,6 +425,7 @@ const getTopInteractedPosts = async (eventId = null, limit = 5, currentUser = nu
       event: {
         select: { id: true, name: true },
       },
+      medias: true,
       _count: {
         select: { comments: true, postLikes: true },
       },

@@ -52,11 +52,11 @@ const unsubscribe = async (req, res, next) => {
 
     const deleted = await webPushService.unsubscribe(userId, endpoint);
 
-    if (deleted) {
-      res.status(200).json({ message: 'Hủy đăng ký thành công' });
-    } else {
-      res.status(404).json({ message: 'Không tìm thấy subscription' });
-    }
+    // Luôn trả 200, dù có xóa được hay không
+    res.status(200).json({ 
+      message: deleted ? 'Hủy đăng ký thành công' : 'Không có subscription để hủy',
+      deleted 
+    });
   } catch (error) {
     next(error);
   }

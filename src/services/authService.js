@@ -292,9 +292,6 @@ const changePassword = async (userId, oldPassword, newPassword) => {
 };
 
 const getUserProfile = async userId => {
-  console.log('=== GET PROFILE DEBUG ===');
-  console.log('Fetching profile for userId:', userId);
-  
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
@@ -313,9 +310,6 @@ const getUserProfile = async userId => {
       updatedAt: true,
     },
   });
-
-  console.log('Returned avatarUrl from DB:', user?.avatarUrl);
-  console.log('=== END GET PROFILE DEBUG ===');
 
   if (!user) {
     throw createError(404, 'Không tìm thấy người dùng');

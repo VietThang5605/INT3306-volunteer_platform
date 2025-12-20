@@ -1,8 +1,6 @@
 const authService = require('../services/authService');
 const createError = require('http-errors');
 
-const REFRESH_TOKEN_EXPIRES_DAYS = parseInt(process.env.REFRESH_TOKEN_EXPIRES_DAYS || '30', 10);
-
 const register = async (req, res, next) => {
   try {
     const userData = req.body;
@@ -15,20 +13,12 @@ const register = async (req, res, next) => {
 
 const verifyEmail = async (req, res, next) => {
   try {
-    // req.query.token đã được Joi validate (từ 'query' source)
     const { token } = req.query; 
 
     await authService.verifyEmail(token);
 
-    // Tốt nhất: Chuyển hướng người dùng về trang login của Frontend
-    // Bạn nên lưu CLIENT_URL trong .env
     const clientLoginUrl = process.env.CLIENT_URL ? `${process.env.CLIENT_URL}/login` : '/';
-    
-    // Gửi một thông báo đơn giản, hoặc redirect
     res.redirect(`${clientLoginUrl}?verified=true`);
-    
-    // Hoặc trả về JSON
-    res.status(200).json({ message: 'Xác thực email thành công. Bạn đã có thể đăng nhập.' });
   } catch (error) {
     next(error);
   }
@@ -103,15 +93,8 @@ const logout = async (req, res, next) => {
 };
 
 const refreshToken = async (req, res, next) => {
-  // 1. Lấy token từ cookie hoặc body (hỗ trợ cả 2 cách)
   const rawTokenString =
     req.cookies.refreshToken || req.cookies.refresh_token || req.body.refreshToken;
-
-  console.log('=== REFRESH DEBUG BE ===');
-  console.log('cookies.refreshToken:', req.cookies.refreshToken ? 'có' : 'không');
-  console.log('cookies.refresh_token:', req.cookies.refresh_token ? 'có' : 'không');
-  console.log('body.refreshToken:', req.body.refreshToken ? 'có' : 'không');
-  console.log('rawTokenString:', rawTokenString ? rawTokenString.substring(0, 20) + '...' : 'null');
 
   if (!rawTokenString) {
     return next(createError(401, 'Không tìm thấy Refresh token'));

@@ -17,7 +17,7 @@ const createNotification = async (userId, content, targetType, targetId) => {
 
     console.log(`[NotificationService] Đã tạo thông báo cho user: ${userId}`);
 
-    // Emit socket event cho real-time notification
+    // Emit socket event cho real-time notification (luôn gửi)
     emitToUser(userId, 'new_notification', {
       notification: {
         ...notification,
@@ -25,17 +25,22 @@ const createNotification = async (userId, content, targetType, targetId) => {
       },
     });
 
-    // Gửi Web Push notification
-    webPushService.sendToUser(userId, {
-      title: 'Thông báo mới',
-      body: content,
-      data: {
-        notificationId: notification.id,
-        targetType,
-        targetId,
-        url: getNotificationUrl(targetType, targetId),
-      },
-    });
+    // Chỉ gửi Web Push cho REGISTRATION (việc quan trọng khi user tắt app)
+    // Các loại khác (POST, like, comment...) chỉ cần socket là đủ
+    if (targetType === 'REGISTRATION') {
+      webPushService.sendToUser(userId, {
+        title: 'Thông báo đăng ký sự kiện',
+        body: content,
+        data: {
+          notificationId: notification.id,
+          targetType,
+          targetId,
+          url: getNotificationUrl(targetType, targetId),
+        },
+      }).catch(err => console.error('[NotificationService] WebPush error:', err));
+    }
+
+    return notification;
 
   } catch (error) {
     // Rất quan trọng: Tác vụ nền không bao giờ được ném lỗi ra ngoài.

@@ -18,6 +18,18 @@ const commentController = require('../../controllers/commentController');
  *   description: Quản lý bài viết và các tương tác liên quan (like, comment)
  */
 
+/**
+ * @swagger
+ * /posts/trending:
+ *   get:
+ *     summary: Lấy top 10 bài viết trending (nhiều like/comment nhất)
+ *     tags: [Posts]
+ *     responses:
+ *       "200":
+ *         description: Danh sách bài viết trending
+ */
+router.get('/trending', postController.getTrendingGlobal);
+
 router.use(auth);
 
 /**
@@ -192,14 +204,9 @@ router.post(
 
 router.post(
   '/:id/status',
-  validate(postIdSchema, 'params'),     // Validate ID
-  validate(updatePostStatusSchema),     // Validate Body (APPROVED/REJECTED)
+  validate(postIdSchema, 'params'),
+  validate(updatePostStatusSchema),
   postController.updateStatus
-);
-
-router.get(
-  '/trending',
-  postController.getTrendingGlobal
 );
 
 module.exports = router;

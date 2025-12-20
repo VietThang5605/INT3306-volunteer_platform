@@ -12,45 +12,50 @@ const initSocket = (httpServer) => {
       methods: ['GET', 'POST'],
       credentials: true,
     },
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    transports: ['websocket', 'polling'],
   });
 
   io.on('connection', (socket) => {
-    console.log(`[Socket] Client connected: ${socket.id}`);
+    console.log(`[Socket] Connected: ${socket.id}`);
 
-    // User join vào room của post để nhận update
     socket.on('join_post', (postId) => {
+      if (!postId) return;
       socket.join(`post:${postId}`);
-      console.log(`[Socket] ${socket.id} joined post:${postId}`);
     });
 
-    // User rời khỏi room
     socket.on('leave_post', (postId) => {
+      if (!postId) return;
       socket.leave(`post:${postId}`);
-      console.log(`[Socket] ${socket.id} left post:${postId}`);
     });
 
-    // User join vào room của event
     socket.on('join_event', (eventId) => {
+      if (!eventId) return;
       socket.join(`event:${eventId}`);
-      console.log(`[Socket] ${socket.id} joined event:${eventId}`);
     });
 
     socket.on('leave_event', (eventId) => {
+      if (!eventId) return;
       socket.leave(`event:${eventId}`);
     });
 
-    // User join vào room cá nhân để nhận notification
     socket.on('join_user', (userId) => {
+      if (!userId) return;
       socket.join(`user:${userId}`);
-      console.log(`[Socket] ${socket.id} joined user:${userId}`);
     });
 
     socket.on('leave_user', (userId) => {
+      if (!userId) return;
       socket.leave(`user:${userId}`);
     });
 
-    socket.on('disconnect', () => {
-      console.log(`[Socket] Client disconnected: ${socket.id}`);
+    socket.on('error', (error) => {
+      console.error(`[Socket] Error: ${socket.id}`, error);
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log(`[Socket] Disconnected: ${socket.id} - ${reason}`);
     });
   });
 
@@ -67,27 +72,18 @@ const getIO = () => {
   return io;
 };
 
-/**
- * Emit event đến tất cả user đang xem 1 post
- */
 const emitToPost = (postId, event, data) => {
   if (io) {
     io.to(`post:${postId}`).emit(event, data);
   }
 };
 
-/**
- * Emit event đến tất cả user đang xem 1 event
- */
 const emitToEvent = (eventId, event, data) => {
   if (io) {
     io.to(`event:${eventId}`).emit(event, data);
   }
 };
 
-/**
- * Emit event đến 1 user cụ thể (dùng cho notification)
- */
 const emitToUser = (userId, event, data) => {
   if (io) {
     io.to(`user:${userId}`).emit(event, data);
