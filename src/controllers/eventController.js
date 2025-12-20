@@ -95,6 +95,21 @@ const getMyEvents = async (req, res, next) => {
   }
 };
 
+
+
+const getAllEvents = async (req, res, next) => {
+  try {
+    const options = req.query; // { page, limit, status, search }
+    
+    // Gọi service
+    const result = await eventService.getAllEventsForAdmin(options);
+    
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getPublicEvents,
   getPublicEvent,
@@ -102,4 +117,5 @@ module.exports = {
   updateEvent,
   deleteEvent,
   getMyEvents,
+  getAllEvents,
 };

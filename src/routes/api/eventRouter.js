@@ -3,7 +3,7 @@ const router = express.Router();
 
 const { auth, permit } = require('../../middlewares/auth');
 const validate = require('../../middlewares/validate');
-const { listEventsSchema, eventIdSchema, createEventSchema, updateEventSchema } = require('../../validators/event.validator');
+const { listEventsSchema, listManagerEventsSchema, eventIdSchema, createEventSchema, updateEventSchema } = require('../../validators/event.validator');
 const { listRegistrationsSchema } = require('../../validators/registration.validator');
 const { listPostsSchema } = require('../../validators/post.validator');
 const upload = require('../../config/cloudinary');
@@ -21,10 +21,18 @@ const registrationController = require('../../controllers/registrationController
 
 
 router.get(
-  '/me',
+  '/admin',
+  auth, // 1. Phải đăng nhập
+  permit('ADMIN'), // 2. Phải là Admin
+  validate(listManagerEventsSchema, 'query'), // 3. Validate phân trang/lọc (như Manager)
+  eventController.getAllEvents // 4. Controller mới
+);
+
+router.get(
+  '/manager',
   auth, // 1. Phải đăng nhập
   permit('MANAGER'), // 2. (Tùy chọn) Nếu muốn chặn Volunteer gọi API này thì uncomment
-  validate(listEventsSchema, 'query'), // 3. Validate phân trang (page, limit...)
+  validate(listManagerEventsSchema, 'query'), // 3. Validate phân trang (page, limit...) & status
   eventController.getMyEvents
 );
 

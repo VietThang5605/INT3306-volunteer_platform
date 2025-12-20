@@ -203,6 +203,70 @@ const deleteEvent = async (eventId, managerId) => {
   return; // Hoàn thành
 };
 
+const getAllEventsForAdmin = async (options) => {
+  const page = parseInt(options.page, 10) || 1;
+  const limit = parseInt(options.limit, 10) || 10;
+  const skip = (page - 1) * limit;
+
+  // 1. Xử lý phần Lọc (Filter)
+  const where = {};
+
+  // Lọc theo trạng thái
+  if (options.status) {
+    where.status = options.status;
+  }
+
+  // Tìm kiếm theo tên
+  if (options.search) {
+    where.name = {
+      contains: options.search,
+      mode: 'insensitive',
+    };
+  }
+
+  // 2. Query Database
+  const [events, total] = await prisma.$transaction([
+    prisma.event.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        category: true,
+        manager: {
+          select: { id: true, fullName: true, email: true, avatarUrl: true }, // Admin cần xem chi tiết manager
+        },
+        registrations: {
+          where: { status: 'CONFIRMED' },
+          select: { id: true },
+        },
+      },
+    }),
+    prisma.event.count({ where }),
+  ]);
+
+  const totalPages = Math.ceil(total / limit);
+
+  // Map data
+  const data = events.map(event => {
+    const { registrations, ...rest } = event;
+    return {
+      ...rest,
+      participantCount: registrations.length,
+    };
+  });
+
+  return {
+    data: data,
+    pagination: {
+      totalItems: total,
+      totalPages,
+      currentPage: page,
+      limit,
+    },
+  };
+};
+
 const getEventsByManager = async (managerId, options) => {
   const page = parseInt(options.page, 10) || 1;
   const limit = parseInt(options.limit, 10) || 10;
@@ -273,4 +337,5 @@ module.exports = {
   updateEvent,
   deleteEvent,
   getEventsByManager,
+  getAllEventsForAdmin,
 };
