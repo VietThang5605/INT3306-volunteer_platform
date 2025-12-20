@@ -46,6 +46,10 @@ const listPublicEvents = async (options) => {
         manager: {
           select: { id: true, fullName: true, avatarUrl: true },
         },
+        registrations: {
+          where: { status: 'CONFIRMED' },
+          select: { id: true },
+        },
       },
     }),
     prisma.event.count({ where }),
@@ -54,8 +58,17 @@ const listPublicEvents = async (options) => {
   // 6. Tính toán thông tin phân trang
   const totalPages = Math.ceil(total / limit);
 
+  // 7. Map data để thêm participantCount
+  const data = events.map(event => {
+    const { registrations, ...rest } = event;
+    return {
+      ...rest,
+      participantCount: registrations.length,
+    };
+  });
+
   return {
-    data: events,
+    data: data,
     pagination: {
       totalItems: total,
       totalPages,
@@ -75,6 +88,10 @@ const getPublicEventById = async (eventId) => {
       manager: {
         select: { id: true, fullName: true, avatarUrl: true }, // Thông tin an toàn
       },
+      registrations: {
+        where: { status: 'CONFIRMED' },
+        select: { id: true },
+      },
     },
   });
 
@@ -82,7 +99,12 @@ const getPublicEventById = async (eventId) => {
     throw createError(404, 'Không tìm thấy sự kiện');
   }
 
-  return event;
+  // Tính toán số lượng participant
+  const { registrations, ...rest } = event;
+  return {
+    ...rest,
+    participantCount: registrations.length,
+  };
 };
 
 const createEvent = async (eventData, managerId) => {
@@ -213,8 +235,9 @@ const getEventsByManager = async (managerId, options) => {
       orderBy: { createdAt: 'desc' }, // Sự kiện mới tạo lên đầu
       include: {
         category: true, // Lấy kèm thông tin danh mục
-        _count: {
-          select: { registrations: true }, // Đếm số người đã đăng ký
+        registrations: {
+          where: { status: 'CONFIRMED' },
+          select: { id: true },
         },
       },
     }),
@@ -223,8 +246,17 @@ const getEventsByManager = async (managerId, options) => {
 
   const totalPages = Math.ceil(total / limit);
 
+  // Map data
+  const data = events.map(event => {
+    const { registrations, ...rest } = event;
+    return {
+      ...rest,
+      participantCount: registrations.length,
+    };
+  });
+
   return {
-    data: events,
+    data: data,
     pagination: {
       totalItems: total,
       totalPages,
