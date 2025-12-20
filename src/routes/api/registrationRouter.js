@@ -16,6 +16,37 @@ const registrationController = require('../../controllers/registrationController
 
 /**
  * @swagger
+ * /registrations/my-channels:
+ *   get:
+ *     summary: Lấy danh sách kênh trao đổi (sự kiện đã được CONFIRMED)
+ *     tags: [Registrations]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *     responses:
+ *       "200":
+ *         description: Danh sách kênh trao đổi
+ *       "401":
+ *         description: Chưa xác thực
+ */
+router.get(
+  '/my-channels',
+  auth,
+  registrationController.getMyChannels
+);
+
+/**
+ * @swagger
  * /registrations:
  *   get:
  *     summary: Lấy danh sách đăng ký (của tôi hoặc của tất cả nếu là Manager/Admin)

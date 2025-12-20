@@ -8,7 +8,7 @@ passport.use(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: '/api/v1/auth/google/callback', // Phải khớp với Google Console
+      callbackURL: process.env.GOOGLE_CALLBACK_URL || 'http://localhost:3000/api/auth/google/callback',
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
@@ -31,6 +31,11 @@ passport.use(
               data: { googleId: googleId, avatarUrl: user.avatarUrl || photo },
             });
           }
+          // Lấy lại thông tin user mới nhất từ DB (bao gồm avatarUrl đã được update)
+          // để đảm bảo trả về đúng avatar hiện tại, không phải avatar từ Google
+          user = await prisma.user.findUnique({
+            where: { id: user.id },
+          });
           return done(null, user);
         }
 
@@ -43,6 +48,10 @@ passport.use(
             avatarUrl: photo,
             role: 'VOLUNTEER', // Mặc định là TNV
             isActive: true, // Email Google đã xác thực nên active luôn
+            isEmailVerified: true, // Email Google đã xác thực
+            phoneNumber: 'null',
+            location: 'null',
+            dob: new Date('1979-12-31'),
             // passwordHash để null
           },
         });

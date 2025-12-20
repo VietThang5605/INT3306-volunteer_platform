@@ -11,7 +11,7 @@ const {
 const validate = require('../../middlewares/validate');
 const { auth } = require('../../middlewares/auth');
 const { authLimiter } = require('../../middlewares/rateLimiter');
-const { genToken } = require('../../utils/token');
+const { signAccessToken, generateRefreshToken } = require('../../services/authService');
 const passport = require('../../config/passport');
 const upload = require('../../config/cloudinary');
 const prisma = require('../../prisma/client');
@@ -256,6 +256,7 @@ router.get(
   passport.authenticate('google', {
     scope: ['profile', 'email'],
     session: false,
+    prompt: 'select_account', // Hiển thị màn hình chọn tài khoản Google
   })
 );
 
@@ -263,47 +264,71 @@ router.get(
   '/google/callback',
   passport.authenticate('google', {
     session: false,
-    failureRedirect: `${process.env.CLIENT_URL}/login?error=google_auth_failed`, // Nếu lỗi thì đá về trang login frontend
+    failureRedirect: `${process.env.CLIENT_URL}/login?error=google_auth_failed`,
   }),
   async (req, res) => {
-    // Tại đây, req.user đã có dữ liệu user (nhờ passport xử lý thành công)
     const user = req.user;
 
-    // 3. Tạo JWT Token (Logic giống hệt API Login thường)
-    const { accessToken, refreshToken } = await genToken(user);
+    // 3. Tạo JWT Token
+    const accessToken = signAccessToken(user);
+    const { rawToken: refreshToken } = await generateRefreshToken(user.id, null, null, true);
 
-    // 4. Lưu Refresh Token vào Cookie
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
-    // 5. (QUAN TRỌNG) Chuyển hướng về Frontend kèm theo Access Token
-    // Frontend sẽ lấy token từ URL này để lưu vào localStorage
-    res.redirect(`${process.env.CLIENT_URL}/oauth-success?token=${accessToken}`);
-  }
+    // 4. Chuyển hướng về Frontend kèm theo tokens và user info
+    const userInfo = encodeURIComponent(
+      JSON.stringify({
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role,
+        avatarUrl: user.avatarUrl,
+      }),
+    );
+    res.redirect(
+      `${process.env.CLIENT_URL}/oauth-success?token=${accessToken}&refreshToken=${refreshToken}&user=${userInfo}`,
+    );
+  },
 );
 
 router.post(
   '/me/avatar',
   auth,
-  upload.single('avatar'), // 'avatar' là tên field trong form-data
+  (req, res, next) => {
+    console.log('=== UPLOAD MIDDLEWARE DEBUG ===');
+    console.log('Content-Type:', req.headers['content-type']);
+    
+    upload.single('avatar')(req, res, (err) => {
+      if (err) {
+        console.error('Multer/Cloudinary upload error:', err);
+        return next(createError(500, `Upload failed: ${err.message}`));
+      }
+      console.log('req.file after multer:', req.file);
+      console.log('=== END UPLOAD MIDDLEWARE DEBUG ===');
+      next();
+    });
+  },
   async (req, res, next) => {
     try {
-      if (!req.file) throw createError(400, 'Chưa chọn file ảnh');
-
-      const avatarUrl = req.file.path; // URL từ Cloudinary trả về
+      // Cloudinary trả về url/secure_url, không phải path
+      const avatarUrl = req.file?.secure_url || req.file?.url || req.file?.path;
+      
+      if (!req.file || !avatarUrl) throw createError(400, 'Không nhận được file ảnh hợp lệ');
+      
+      console.log('=== AVATAR UPDATE DEBUG ===');
+      console.log('User ID:', req.user.id);
+      console.log('New Avatar URL:', avatarUrl);
       
       // Update vào DB
-      await prisma.user.update({
+      const updatedUser = await prisma.user.update({
         where: { id: req.user.id },
         data: { avatarUrl: avatarUrl },
       });
 
+      console.log('Updated user avatarUrl in DB:', updatedUser.avatarUrl);
+      console.log('=== END DEBUG ===');
+
       res.status(200).json({ message: 'Cập nhật avatar thành công', url: avatarUrl });
     } catch (error) {
+      console.error('Avatar update error:', error);
       next(error);
     }
   }

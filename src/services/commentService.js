@@ -3,6 +3,7 @@ const prisma = require('../prisma/client');
 const createError = require('http-errors');
 const notificationService = require('./notificationService');
 const { verifyPostAccessibility } = require('./postService');
+const { emitToPost } = require('../socket');
 
 const listCommentsForPost = async (postId, options, userId) => {
   // 1. Check quyền xem bài viết
@@ -28,13 +29,7 @@ const listCommentsForPost = async (postId, options, userId) => {
       orderBy: { createdAt: 'desc' },
       include: {
         author: { select: { id: true, fullName: true, avatarUrl: true } },
-        // 🔽 Lấy kèm Replies
-        replies: {
-          orderBy: { createdAt: 'asc' }, // Reply cũ nhất lên trước (giống Facebook)
-          include: {
-            author: { select: { id: true, fullName: true, avatarUrl: true } },
-          },
-        },
+        _count: { select: { commentLikes: true } },
       },
     }),
     prisma.comment.count({ where }),
@@ -88,8 +83,8 @@ const createComment = async (postId, userId, content, parentId = null) => {
     notificationService.createNotification(
       parentComment.userId,
       `"${newComment.author.fullName}" đã trả lời bình luận của bạn.`,
-      'COMMENT_REPLY',
-      postId // Link về bài post
+      'POST', // Link về bài post
+      postId
     ).catch(console.error);
   }
   
@@ -99,10 +94,22 @@ const createComment = async (postId, userId, content, parentId = null) => {
      notificationService.createNotification(
       post.userId,
       `"${newComment.author.fullName}" đã bình luận về bài viết của bạn.`,
-      'POST_COMMENT',
+      'POST',
       postId
     ).catch(console.error);
   }
+
+  // 5. Emit socket event để real-time update
+  // Đếm tổng số comment của post
+  const commentCount = await prisma.comment.count({
+    where: { postId },
+  });
+
+  emitToPost(postId, 'new_comment', {
+    comment: newComment,
+    postId,
+    commentCount,
+  });
 
   return newComment;
 };
@@ -113,6 +120,7 @@ const deleteComment = async (commentId, user) => {
     where: { id: commentId },
     select: {
       userId: true, // ID của Tác giả (Author)
+      postId: true, // Cần để emit socket
       post: {
         select: {
           event: {
@@ -138,10 +146,20 @@ const deleteComment = async (commentId, user) => {
     throw createError(403, 'Bạn không có quyền xóa bình luận này');
   }
 
+  const postId = comment.postId;
+
   // 3. Thực hiện xóa
   await prisma.comment.delete({
     where: { id: commentId },
   });
+
+  // Đếm lại số comment
+  const commentCount = await prisma.comment.count({
+    where: { postId },
+  });
+
+  // 4. Emit socket event
+  emitToPost(postId, 'delete_comment', { commentId, postId, commentCount });
 
   return; // Hoàn thành
 };
@@ -177,15 +195,34 @@ const toggleCommentLike = async (commentId, userId) => {
     await prisma.commentLike.delete({
       where: { id: existingLike.id },
     });
+
+    // Đếm lại số like
+    const likeCount = await prisma.commentLike.count({
+      where: { commentId },
+    });
+
+    // Emit socket
+    emitToPost(comment.postId, 'comment_like_update', {
+      commentId,
+      postId: comment.postId,
+      liked: false,
+      userId,
+      likeCount,
+    });
+
     return { liked: false, message: 'Đã hủy like' };
   } else {
     // Chưa Like -> Bây giờ Like
-    // eslint-disable-next-line no-unused-vars
-    const newLike = await prisma.commentLike.create({
+    await prisma.commentLike.create({
       data: {
         userId: userId,
         commentId: commentId,
       },
+    });
+
+    // Đếm lại số like
+    const likeCount = await prisma.commentLike.count({
+      where: { commentId },
     });
 
     // 5. 🔔 (Nâng cao) Gửi thông báo cho tác giả bình luận
@@ -197,6 +234,15 @@ const toggleCommentLike = async (commentId, userId) => {
         post.id
       ).catch(console.error);
     }
+
+    // Emit socket
+    emitToPost(comment.postId, 'comment_like_update', {
+      commentId,
+      postId: comment.postId,
+      liked: true,
+      userId,
+      likeCount,
+    });
     
     return { liked: true, message: 'Đã like bình luận' };
   }

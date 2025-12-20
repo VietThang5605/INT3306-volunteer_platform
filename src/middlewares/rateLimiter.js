@@ -1,6 +1,9 @@
 // src/middlewares/rateLimiter.js
 const rateLimit = require('express-rate-limit');
 
+// Rate limit đã được BẬT
+const DISABLE_RATE_LIMIT = false;
+
 /**
  * Giới hạn CHUNG cho hầu hết các API
  * (Ví dụ: 100 yêu cầu mỗi 15 phút)
@@ -15,6 +18,7 @@ const generalLimiter = rateLimit({
   },
   standardHeaders: true, // Gửi header `RateLimit-*` (chuẩn)
   legacyHeaders: false, // Tắt header `X-RateLimit-*` (cũ)
+  skip: () => DISABLE_RATE_LIMIT, // Tắt rate limit
 });
 
 /**
@@ -31,6 +35,7 @@ const authLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => DISABLE_RATE_LIMIT, // Tắt rate limit
 });
 
 module.exports = {

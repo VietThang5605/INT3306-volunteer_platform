@@ -1,6 +1,7 @@
 const prisma = require('../prisma/client');
 const createError = require('http-errors');
 const notificationService = require('./notificationService'); // Import để thông báo
+const { emitToPost, emitToEvent } = require('../socket');
 
 const checkEventAccess = async eventId => {
   const event = await prisma.event.findUnique({
@@ -25,12 +26,12 @@ const listPostsForEvent = async (eventId, options, currentUser) => {
   const event = await checkEventAccess(eventId);
 
   // 2. Kiểm tra xem User có phải là "Người tham gia" (Participant) không?
-  // Điều kiện: Đã đăng ký VÀ trạng thái là CONFIRMED (hoặc COMPLETED)
+  // Điều kiện: Đã đăng ký VÀ trạng thái là CONFIRMED
   const registration = await prisma.eventRegistration.findFirst({
     where: {
       eventId: eventId,
       userId: currentUser.id,
-      status: { in: ['CONFIRMED', 'COMPLETED'] }, // Chỉ người đã được duyệt mới coi là tham gia
+      status: 'CONFIRMED',
     },
   });
 
@@ -72,6 +73,7 @@ const listPostsForEvent = async (eventId, options, currentUser) => {
       orderBy: { createdAt: 'desc' },
       include: {
         author: { select: { id: true, fullName: true, avatarUrl: true } },
+        medias: true,
         _count: { select: { comments: true, postLikes: true } },
       },
     }),
@@ -94,23 +96,32 @@ const createPost = async (eventId, userId, content, visibility = 'PUBLIC', media
 
   // 3. Chuẩn bị dữ liệu Media (nếu có)
   // mediaFiles là mảng file từ Multer/Cloudinary trả về
-  const mediasData = mediaFiles.map((file) => ({
-    url: file.path, // URL trên Cloudinary
-    type: file.mimetype.startsWith('image/') ? 'IMAGE' : 'VIDEO', // Tự động nhận diện loại
-  }));
+  // Cloudinary trả về secure_url hoặc url
+  const mediasData = mediaFiles
+    .filter((file) => file.secure_url || file.url || file.path)
+    .map((file) => ({
+      url: file.secure_url || file.url || file.path,
+      type: file.mimetype.startsWith('image/') ? 'IMAGE' : 'VIDEO',
+    }));
 
   // 4. Tạo Post và lưu vào DB (Dùng Nested Write để tạo luôn Media)
+  const postData = {
+    content,
+    eventId,
+    userId,
+    status: initialStatus,
+    visibility: visibility,
+  };
+
+  // Chỉ thêm medias nếu có file upload thành công
+  if (mediasData.length > 0) {
+    postData.medias = {
+      create: mediasData,
+    };
+  }
+
   const newPost = await prisma.post.create({
-    data: {
-      content,
-      eventId,
-      userId,
-      status: initialStatus,
-      visibility: visibility, // PUBLIC hoặc PRIVATE
-      medias: {
-        create: mediasData, // Lưu danh sách ảnh/video
-      },
-    },
+    data: postData,
     include: {
       author: { select: { id: true, fullName: true, avatarUrl: true } },
       medias: true, // Trả về kèm danh sách media vừa tạo
@@ -122,9 +133,14 @@ const createPost = async (eventId, userId, content, visibility = 'PUBLIC', media
     notificationService.createNotification(
       event.managerId,
       `"${newPost.author.fullName}" vừa đăng bài viết mới cần duyệt trong sự kiện "${event.name}".`,
-      'POST_APPROVAL', // Loại thông báo: Cần duyệt bài
+      'POST', // Loại thông báo: Liên quan đến bài viết
       newPost.id
     ).catch(console.error); // Fire-and-forget (không chờ, không crash nếu lỗi gửi thông báo)
+  }
+
+  // 6. Emit socket nếu bài đã được duyệt (Manager đăng)
+  if (initialStatus === 'APPROVED') {
+    emitToEvent(eventId, 'new_post', { post: newPost });
   }
 
   return newPost;
@@ -171,7 +187,7 @@ const updatePostStatus = async (postId, managerId, status) => {
       .createNotification(
         post.userId,
         `Bài viết của bạn trong sự kiện "${post.event.name}" đã bị từ chối.`,
-        'SYSTEM',
+        'OTHER',
         null,
       )
       .catch(console.error);
@@ -245,15 +261,33 @@ const togglePostLike = async (postId, userId) => {
     await prisma.postLike.delete({
       where: { id: existingLike.id },
     });
+
+    // Đếm lại số like
+    const likeCount = await prisma.postLike.count({
+      where: { postId },
+    });
+
+    // Emit socket
+    emitToPost(postId, 'post_like_update', {
+      postId,
+      liked: false,
+      userId,
+      likeCount,
+    });
+
     return { liked: false, message: 'Đã hủy like' };
   } else {
     // Chưa Like -> Bây giờ Like
-    // eslint-disable-next-line no-unused-vars
-    const newLike = await prisma.postLike.create({
+    await prisma.postLike.create({
       data: {
         userId: userId,
         postId: postId,
       },
+    });
+
+    // Đếm lại số like
+    const likeCount = await prisma.postLike.count({
+      where: { postId },
     });
 
     // 4. 🔔 (TÍNH NĂNG NÂNG CAO) Gửi thông báo cho tác giả
@@ -268,6 +302,14 @@ const togglePostLike = async (postId, userId) => {
         )
         .catch(console.error);
     }
+
+    // Emit socket
+    emitToPost(postId, 'post_like_update', {
+      postId,
+      liked: true,
+      userId,
+      likeCount,
+    });
 
     return { liked: true, message: 'Đã like bài post' };
   }
@@ -304,7 +346,7 @@ const getTopInteractedPosts = async (eventId = null, limit = 5, currentUser = nu
           where: {
             eventId: eventId,
             userId: currentUser.id,
-            status: { in: ['CONFIRMED', 'COMPLETED'] },
+            status: 'CONFIRMED',
           },
         });
         if (registration) canViewPrivate = true;
@@ -370,7 +412,7 @@ const verifyPostAccessibility = async (postId, userId) => {
       where: {
         eventId: post.event.id,
         userId: userId,
-        status: { in: ['CONFIRMED', 'COMPLETED'] },
+        status: 'CONFIRMED',
       },
     });
 

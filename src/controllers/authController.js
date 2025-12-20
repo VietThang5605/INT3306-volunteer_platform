@@ -1,7 +1,7 @@
 const authService = require('../services/authService');
 const createError = require('http-errors');
 
-const REFRESH_TOKEN_EXPIRES_DAYS = parseInt(process.env.REFRESH_TOKEN_EXPIRES_DAYS || '7', 10);
+const REFRESH_TOKEN_EXPIRES_DAYS = parseInt(process.env.REFRESH_TOKEN_EXPIRES_DAYS || '30', 10);
 
 const register = async (req, res, next) => {
   try {
@@ -36,17 +36,21 @@ const verifyEmail = async (req, res, next) => {
 
 const login = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
-    const { user, accessToken, refreshToken } = await authService.loginUser({ email, password });
+    const { email, password, rememberMe = true } = req.body;
+    const { user, accessToken, refreshToken, expiryDays } = await authService.loginUser({
+      email,
+      password,
+      rememberMe,
+    });
 
     res.cookie(
-      'refreshToken', // Tên cookie
-      refreshToken, // Giá trị
+      'refreshToken',
+      refreshToken,
       {
-        httpOnly: true, // Quan trọng: Chống XSS
-        // secure: process.env.NODE_ENV === 'production', // Chỉ gửi qua HTTPS
-        sameSite: 'Strict', // Quan trọng: Chống CSRF
-        maxAge: REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60 * 1000, // 7 ngày (phải khớp với logic DB)
+        httpOnly: true,
+        secure: true,
+        sameSite: 'None',
+        maxAge: expiryDays * 24 * 60 * 60 * 1000, // Dùng expiryDays từ service
         path: '/',
       },
     );
@@ -55,7 +59,8 @@ const login = async (req, res, next) => {
       message: 'Đăng nhập thành công',
       user: { id: user.id, email: user.email, fullName: user.fullName, role: user.role },
       accessToken,
-      // refreshToken,
+      refreshToken,
+      expiryDays, // Trả về để FE biết thời hạn
     });
   } catch (error) {
     next(error);
@@ -79,8 +84,8 @@ const logout = async (req, res, next) => {
     // 3. (Quan trọng) Xóa cookie khỏi trình duyệt
     res.clearCookie('refreshToken', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'Strict',
+      secure: true,
+      sameSite: 'None',
     });
 
     // 4. Trả về thành công
@@ -90,16 +95,23 @@ const logout = async (req, res, next) => {
     // chúng ta vẫn nên xóa cookie
     res.clearCookie('refreshToken', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'prod',
-      sameSite: 'Strict',
+      secure: true,
+      sameSite: 'None',
     });
     next(error);
   }
 };
 
 const refreshToken = async (req, res, next) => {
-  // 1. Lấy token THÔ từ cookie
-  const rawTokenString = req.cookies.refreshToken;
+  // 1. Lấy token từ cookie hoặc body (hỗ trợ cả 2 cách)
+  const rawTokenString =
+    req.cookies.refreshToken || req.cookies.refresh_token || req.body.refreshToken;
+
+  console.log('=== REFRESH DEBUG BE ===');
+  console.log('cookies.refreshToken:', req.cookies.refreshToken ? 'có' : 'không');
+  console.log('cookies.refresh_token:', req.cookies.refresh_token ? 'có' : 'không');
+  console.log('body.refreshToken:', req.body.refreshToken ? 'có' : 'không');
+  console.log('rawTokenString:', rawTokenString ? rawTokenString.substring(0, 20) + '...' : 'null');
 
   if (!rawTokenString) {
     return next(createError(401, 'Không tìm thấy Refresh token'));
@@ -107,25 +119,27 @@ const refreshToken = async (req, res, next) => {
 
   try {
     // 2. Gọi service (service sẽ trả về token THÔ mới)
-    const { accessToken, rawRefreshToken } = await authService.rotateRefreshToken(rawTokenString);
+    const { accessToken, rawRefreshToken, expiryDays } = await authService.rotateRefreshToken(rawTokenString);
 
     // 3. Đặt cookie MỚI (chứa token THÔ mới)
     res.cookie(
       'refreshToken',
-      rawRefreshToken, // Đặt token THÔ mới
+      rawRefreshToken,
       {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'prod',
-        sameSite: 'Strict',
-        maxAge: REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60 * 1000,
+        secure: true,
+        sameSite: 'None',
+        maxAge: expiryDays * 24 * 60 * 60 * 1000,
         path: '/',
       },
     );
 
-    // 4. Trả về accessToken MỚI
+    // 4. Trả về accessToken và refreshToken MỚI
     res.json({
       message: 'Token được làm mới thành công',
       accessToken,
+      refreshToken: rawRefreshToken,
+      expiryDays,
     });
   } catch (error) {
     next(error);

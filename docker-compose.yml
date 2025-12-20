@@ -3,11 +3,21 @@ services:
     build: .
     restart: unless-stopped
     ports:
-      - "80:3000"
+      - "3000:3000"
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     environment:
       PORT: 3000
       JWT_SECRET: ${JWT_SECRET}
       DATABASE_URL: ${DATABASE_URL}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL}
+      CLIENT_URL: ${CLIENT_URL}
     volumes:
       - .:/app
       - /app/node_modules

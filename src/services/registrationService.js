@@ -217,7 +217,6 @@ const listRegistrationsForEvent = async (eventId, managerId, options) => {
             id: true,
             fullName: true,
             email: true, // Manager có thể cần email để liên hệ
-            phoneNumber: true,
             avatarUrl: true,
           },
         },
@@ -304,10 +303,139 @@ const updateRegistrationStatus = async (registrationId, managerId, newStatus) =>
   return updatedRegistration;
 };
 
+/**
+ * Lấy danh sách kênh trao đổi (sự kiện đã được CONFIRMED)
+ * Trả về thông tin đầy đủ cho UI: ảnh, tên, bài viết mới nhất, số người, số bài viết
+ */
+const getMyChannels = async (userId, options) => {
+  const page = parseInt(options.page, 10) || 1;
+  const limit = parseInt(options.limit, 10) || 10;
+  const skip = (page - 1) * limit;
+
+  // 1. Lấy danh sách sự kiện đã CONFIRMED
+  const [registrations, total] = await prisma.$transaction([
+    prisma.eventRegistration.findMany({
+      where: {
+        userId: userId,
+        status: 'CONFIRMED',
+      },
+      skip,
+      take: limit,
+      orderBy: { registeredAt: 'desc' },
+      select: {
+        id: true,
+        registeredAt: true,
+        event: {
+          select: {
+            id: true,
+            name: true,
+            coverUrl: true,
+            startTime: true,
+            // Đếm số người tham gia (CONFIRMED)
+            _count: {
+              select: {
+                registrations: {
+                  where: { status: 'CONFIRMED' },
+                },
+                posts: true,
+              },
+            },
+            // Lấy bài viết/comment mới nhất
+            posts: {
+              take: 1,
+              orderBy: { createdAt: 'desc' },
+              select: {
+                id: true,
+                content: true,
+                createdAt: true,
+                author: {
+                  select: { id: true, fullName: true },
+                },
+                // Lấy comment mới nhất của bài viết
+                comments: {
+                  take: 1,
+                  orderBy: { createdAt: 'desc' },
+                  select: {
+                    id: true,
+                    content: true,
+                    createdAt: true,
+                    author: {
+                      select: { id: true, fullName: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    }),
+    prisma.eventRegistration.count({
+      where: { userId: userId, status: 'CONFIRMED' },
+    }),
+  ]);
+
+  // 2. Format lại data cho FE
+  const channels = registrations.map((reg) => {
+    const event = reg.event;
+    const latestPost = event.posts[0];
+    const latestComment = latestPost?.comments[0];
+
+    // Xác định hoạt động mới nhất (comment hoặc post)
+    let latestActivity = null;
+    if (latestComment && latestPost) {
+      // So sánh xem comment hay post mới hơn
+      if (new Date(latestComment.createdAt) > new Date(latestPost.createdAt)) {
+        latestActivity = {
+          type: 'comment',
+          authorName: latestComment.author.fullName,
+          content: latestComment.content,
+          createdAt: latestComment.createdAt,
+        };
+      } else {
+        latestActivity = {
+          type: 'post',
+          authorName: latestPost.author.fullName,
+          content: latestPost.content,
+          createdAt: latestPost.createdAt,
+        };
+      }
+    } else if (latestPost) {
+      latestActivity = {
+        type: 'post',
+        authorName: latestPost.author.fullName,
+        content: latestPost.content,
+        createdAt: latestPost.createdAt,
+      };
+    }
+
+    return {
+      eventId: event.id,
+      name: event.name,
+      coverUrl: event.coverUrl,
+      startTime: event.startTime,
+      participantsCount: event._count.registrations,
+      postsCount: event._count.posts,
+      latestActivity: latestActivity,
+    };
+  });
+
+  return {
+    data: channels,
+    pagination: {
+      totalItems: total,
+      totalPages: Math.ceil(total / limit),
+      currentPage: page,
+      limit,
+    },
+  };
+};
+
 module.exports = {
   listRegistrations,
   createRegistration,
   deleteRegistration,
   listRegistrationsForEvent,
   updateRegistrationStatus,
+  getMyChannels,
 };

@@ -1,9 +1,11 @@
 const prisma = require('../prisma/client');
 const createError = require('http-errors');
+const webPushService = require('./webPushService');
+const { emitToUser } = require('../socket');
 
 const createNotification = async (userId, content, targetType, targetId) => {
   try {
-    await prisma.notification.create({
+    const notification = await prisma.notification.create({
       data: {
         userId,
         content,
@@ -15,9 +17,25 @@ const createNotification = async (userId, content, targetType, targetId) => {
 
     console.log(`[NotificationService] Đã tạo thông báo cho user: ${userId}`);
 
-    // (NÂNG CAO HƠN NỮA)
-    // Sau khi tạo record, bạn có thể lấy PushSubscription của user này
-    // và gửi một Web Push (nếu có) tại đây.
+    // Emit socket event cho real-time notification
+    emitToUser(userId, 'new_notification', {
+      notification: {
+        ...notification,
+        eventId: null, // FE có thể fetch thêm nếu cần
+      },
+    });
+
+    // Gửi Web Push notification
+    webPushService.sendToUser(userId, {
+      title: 'Thông báo mới',
+      body: content,
+      data: {
+        notificationId: notification.id,
+        targetType,
+        targetId,
+        url: getNotificationUrl(targetType, targetId),
+      },
+    });
 
   } catch (error) {
     // Rất quan trọng: Tác vụ nền không bao giờ được ném lỗi ra ngoài.
@@ -26,6 +44,24 @@ const createNotification = async (userId, content, targetType, targetId) => {
       `[NotificationService] Lỗi khi tạo thông báo cho user ${userId}:`,
       error
     );
+  }
+};
+
+/**
+ * Tạo URL redirect dựa trên loại notification
+ */
+const getNotificationUrl = (targetType, targetId) => {
+  if (!targetType || !targetId) return '/notifications';
+  
+  switch (targetType) {
+    case 'EVENT':
+      return `/events/${targetId}`;
+    case 'POST':
+      return `/posts/${targetId}`;
+    case 'REGISTRATION':
+      return `/registrations/${targetId}`;
+    default:
+      return '/notifications';
   }
 };
 
@@ -56,9 +92,30 @@ const listNotifications = async (userId, options) => {
     prisma.notification.count({ where }),
   ]);
 
+  // 4. Enrich notifications với eventId nếu targetType là POST
+  const enrichedNotifications = await Promise.all(
+    notifications.map(async (noti) => {
+      if (noti.targetType === 'POST' && noti.targetId) {
+        const post = await prisma.post.findUnique({
+          where: { id: noti.targetId },
+          select: { eventId: true },
+        });
+        return { ...noti, eventId: post?.eventId || null };
+      }
+      if (noti.targetType === 'REGISTRATION' && noti.targetId) {
+        const registration = await prisma.eventRegistration.findUnique({
+          where: { id: noti.targetId },
+          select: { eventId: true },
+        });
+        return { ...noti, eventId: registration?.eventId || null };
+      }
+      return { ...noti, eventId: null };
+    })
+  );
+
   const totalPages = Math.ceil(total / limit);
   return {
-    data: notifications,
+    data: enrichedNotifications,
     pagination: { totalItems: total, totalPages, currentPage: page, limit },
   };
 };

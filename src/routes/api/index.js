@@ -9,21 +9,27 @@ const postRouter = require('./postRouter');
 const commentRouter = require('./commentRouter');
 const dashboardRouter = require('./dashboardRouter');
 const notificationRouter = require('./notificationRouter');
+const pushRouter = require('./pushRouter');
+const { generalLimiter } = require('../../middlewares/rateLimiter');
 
 const express = require("express")
 
 const router = express.Router()
 
+// Auth routes dùng authLimiter riêng (đã có trong authRouter)
 router.use('/auth', authRouter);
-router.use('/users', userRouter);
-router.use('/profiles', profileRouter);
-router.use('/events', eventRouter);
-router.use('/admin', adminRouter);
-router.use('/registrations', registrationRouter);
-router.use('/categories', categoryRouter);
-router.use('/posts', postRouter);
-router.use('/comments', commentRouter);
-router.use('/dashboard', dashboardRouter);
-router.use('/notifications', notificationRouter);
+
+// Các routes khác dùng generalLimiter
+router.use('/users', generalLimiter, userRouter);
+router.use('/profiles', generalLimiter, profileRouter);
+router.use('/events', generalLimiter, eventRouter);
+router.use('/admin', generalLimiter, adminRouter);
+router.use('/registrations', generalLimiter, registrationRouter);
+router.use('/categories', generalLimiter, categoryRouter);
+router.use('/posts', generalLimiter, postRouter);
+router.use('/comments', generalLimiter, commentRouter);
+router.use('/dashboard', generalLimiter, dashboardRouter);
+router.use('/notifications', generalLimiter, notificationRouter);
+router.use('/push', generalLimiter, pushRouter);
 
 module.exports = router;

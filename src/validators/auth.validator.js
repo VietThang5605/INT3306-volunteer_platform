@@ -61,6 +61,8 @@ const loginSchema = Joi.object({
       'string.empty': 'Mật khẩu không được để trống',
       'any.required': 'Mật khẩu là trường bắt buộc',
     }),
+
+  rememberMe: Joi.boolean().default(true),
 });
 
 const changePasswordSchema = Joi.object({
@@ -90,14 +92,42 @@ const changePasswordSchema = Joi.object({
 });
 
 const updateProfileSchema = Joi.object({
-  // Chỉ cho phép cập nhật fullName
+  // Cho phép cập nhật các thông tin cá nhân
   fullName: Joi.string()
     .min(3)
-    .optional() // Dùng optional cho PATCH (cho phép chỉ cập nhật 1 trong nhiều trường, nếu sau này thêm 'bio'...)
+    .optional()
     .messages({
       'string.min': 'Họ tên phải có ít nhất 3 ký tự',
     }),
   
+  phoneNumber: Joi.string()
+    .optional()
+    .allow('', null)
+    .messages({
+      'string.base': 'Số điện thoại phải là chuỗi',
+    }),
+
+  location: Joi.string()
+    .optional()
+    .allow('', null)
+    .messages({
+      'string.base': 'Địa chỉ phải là chuỗi',
+    }),
+
+  dob: Joi.date()
+    .optional()
+    .allow(null)
+    .messages({
+      'date.base': 'Ngày sinh không đúng định dạng',
+    }),
+
+  bio: Joi.string()
+    .max(500)
+    .optional()
+    .allow('', null)
+    .messages({
+      'string.max': 'Bio không được quá 500 ký tự',
+    }),
 });
 
 const verifyEmailSchema = Joi.object({

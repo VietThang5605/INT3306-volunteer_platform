@@ -5,6 +5,7 @@ const Joi = require('joi');
 const listPostsSchema = Joi.object({
   page: Joi.number().integer().min(1).default(1),
   limit: Joi.number().integer().min(1).max(100).default(10),
+  status: Joi.string().valid('PENDING', 'APPROVED', 'REJECTED').optional(),
 });
 
 // Validator cho POST /events/:id/posts (tạo post)
