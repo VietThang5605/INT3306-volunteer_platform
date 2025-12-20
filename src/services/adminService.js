@@ -4,6 +4,11 @@ const { Parser } = require('json2csv');
 const ExcelJS = require('exceljs');
 // 1. Import service mới
 const notificationService = require('./notificationService'); 
+const eventService = require('./eventService'); 
+
+const getEventDetail = async (eventId) => {
+  return await eventService.getEventByIdForAdmin(eventId);
+};
 
 const approveEvent = async (eventId) => {
   // 1. & 2. (Giữ nguyên) Kiểm tra event và status ...
@@ -286,5 +291,6 @@ module.exports = {
   approveEvent,
   exportEvents,
   exportUsers,
-  deleteEventByAdmin
+  deleteEventByAdmin,
+  getEventDetail
 };

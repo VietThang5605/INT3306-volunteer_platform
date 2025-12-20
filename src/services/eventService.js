@@ -107,6 +107,46 @@ const getPublicEventById = async (eventId) => {
   };
 };
 
+const getEventByIdForAdmin = async (eventId) => {
+  try {
+    const [event, totalRegistrations] = await prisma.$transaction([
+      prisma.event.findUnique({
+        where: { id: eventId },
+        include: {
+          category: {
+            select: { id: true, name: true },
+          },
+          manager: {
+            select: { id: true, fullName: true, avatarUrl: true, email: true, phoneNumber: true },
+          },
+          registrations: {
+            where: { status: 'CONFIRMED' },
+            select: { id: true },
+          },
+        },
+      }),
+      prisma.eventRegistration.count({
+        where: { eventId: eventId },
+      }),
+    ]);
+
+    if (!event) {
+      throw createError(404, 'Không tìm thấy sự kiện');
+    }
+
+    // Map data
+    const { registrations, ...rest } = event;
+    return {
+      ...rest,
+      participantCount: registrations.length,
+      totalRegistrations,
+    };
+  } catch (error) {
+    console.error("Error in getEventByIdForAdmin:", error);
+    throw error;
+  }
+};
+
 const createEvent = async (eventData, managerId) => {
   // `eventData` chứa: { name, description, startTime, endTime, categoryId, capacity }
 
@@ -338,4 +378,5 @@ module.exports = {
   deleteEvent,
   getEventsByManager,
   getAllEventsForAdmin,
+  getEventByIdForAdmin,
 };
