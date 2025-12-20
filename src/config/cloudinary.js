@@ -12,7 +12,8 @@ const storage = cloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: 'volunteer-hub',
-    allowed_formats: ['jpg', 'png', 'jpeg', 'gif'],
+    allowed_formats: ['jpg', 'png', 'jpeg', 'gif', 'mp4', 'mov', 'avi', 'webm'],
+    resource_type: 'auto', // Tự detect image/video
   },
 });
 
