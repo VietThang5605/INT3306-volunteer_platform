@@ -36,6 +36,14 @@ router.get(
   eventController.getMyEvents
 );
 
+router.get(
+  '/manager/:id',
+  auth,
+  permit('MANAGER'),
+  validate(eventIdSchema, 'params'),
+  eventController.getMyEvent
+);
+
 
 /**
  * @swagger
