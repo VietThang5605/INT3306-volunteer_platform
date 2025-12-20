@@ -4,6 +4,11 @@ const { Parser } = require('json2csv');
 const ExcelJS = require('exceljs');
 // 1. Import service mới
 const notificationService = require('./notificationService'); 
+const eventService = require('./eventService'); 
+
+const getEventDetail = async (eventId) => {
+  return await eventService.getEventByIdForAdmin(eventId);
+};
 
 const approveEvent = async (eventId) => {
   // 1. & 2. (Giữ nguyên) Kiểm tra event và status ...
@@ -282,9 +287,58 @@ const deleteEventByAdmin = async (eventId) => {
   return; // Hoàn thành
 };
 
+const getDashboardStats = async () => {
+  const [
+    totalUsers,
+    totalVolunteers,
+    totalManagers,
+    totalAdmins,
+    totalEvents,
+    pendingEvents,
+    approvedEvents,
+    completedEvents,
+    totalCategories
+  ] = await prisma.$transaction([
+    // User Stats
+    prisma.user.count(),
+    prisma.user.count({ where: { role: 'VOLUNTEER' } }),
+    prisma.user.count({ where: { role: 'MANAGER' } }),
+    prisma.user.count({ where: { role: 'ADMIN' } }),
+    
+    // Event Stats
+    prisma.event.count(),
+    prisma.event.count({ where: { status: 'PENDING' } }),
+    prisma.event.count({ where: { status: 'APPROVED' } }),
+    prisma.event.count({ where: { status: 'COMPLETED' } }),
+    
+    // Category Stats
+    prisma.category.count(),
+  ]);
+
+  return {
+    users: {
+      total: totalUsers,
+      volunteers: totalVolunteers,
+      managers: totalManagers,
+      admins: totalAdmins,
+    },
+    events: {
+      total: totalEvents,
+      pending: pendingEvents,
+      approved: approvedEvents,
+      completed: completedEvents,
+    },
+    categories: {
+      total: totalCategories,
+    }
+  };
+};
+
 module.exports = {
   approveEvent,
   exportEvents,
   exportUsers,
-  deleteEventByAdmin
+  deleteEventByAdmin,
+  getEventDetail,
+  getDashboardStats
 };

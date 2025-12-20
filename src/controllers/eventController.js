@@ -99,6 +99,19 @@ const getEventMembers = async (req, res, next) => {
   }
 };
 
+const getMyEvent = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const managerId = req.user.id;
+    
+    const event = await eventService.getEventByIdForManager(id, managerId);
+    
+    res.status(200).json(event);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getPublicEvents,
   getPublicEvent,
@@ -107,4 +120,6 @@ module.exports = {
   deleteEvent,
   getMyEvents,
   getEventMembers,
+  getAllEvents,
+  getMyEvent,
 };

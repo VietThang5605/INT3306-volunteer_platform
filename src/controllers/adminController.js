@@ -1,12 +1,21 @@
 const adminService = require('../services/adminService');
+const eventService = require('../services/eventService');
 
 const approveEvent = async (req, res, next) => {
   try {
-    const { id: eventId } = req.params; // Lấy ID sự kiện
+    const { id } = req.params;
+    const event = await adminService.approveEvent(id);
+    res.status(200).json(event);
+  } catch (error) {
+    next(error);
+  }
+};
 
-    const updatedEvent = await adminService.approveEvent(eventId);
-    
-    res.status(200).json({message: 'Cập nhật trạng thái thành công', updatedEvent});
+const getEventDetail = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const event = await adminService.getEventDetail(id);
+    res.status(200).json(event);
   } catch (error) {
     next(error);
   }
@@ -76,9 +85,20 @@ const deleteEvent = async (req, res, next) => {
   }
 };
 
+const getDashboardStats = async (req, res, next) => {
+  try {
+    const stats = await adminService.getDashboardStats();
+    res.status(200).json(stats);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   approveEvent,
   exportEvents,
   exportUsers,
   deleteEvent,
-};  
+  getEventDetail,
+  getDashboardStats,
+};
