@@ -217,6 +217,7 @@ const listRegistrationsForEvent = async (eventId, managerId, options) => {
             id: true,
             fullName: true,
             email: true, // Manager có thể cần email để liên hệ
+            phoneNumber: true,
             avatarUrl: true,
           },
         },
