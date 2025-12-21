@@ -33,6 +33,18 @@ const updateUserStatusSchema = Joi.object({
   }),
 });
 
+const PasswordComplexity = require('joi-password-complexity');
+
+const complexityOptions = {
+  min: 8,
+  max: 1024,
+  lowerCase: 1,
+  upperCase: 1,
+  numeric: 1,
+  symbol: 1,
+  requirementCount: 6,
+};
+
 const createManagerSchema = Joi.object({
   fullName: Joi.string().required().messages({
     'any.required': 'Họ tên là bắt buộc',
@@ -41,9 +53,13 @@ const createManagerSchema = Joi.object({
     'string.email': 'Email không hợp lệ',
     'any.required': 'Email là bắt buộc',
   }),
-  password: Joi.string().min(6).required().messages({
-    'string.min': 'Mật khẩu phải có ít nhất 6 ký tự',
+  password: PasswordComplexity(complexityOptions).required().messages({
     'any.required': 'Mật khẩu là bắt buộc',
+    'passwordComplexity.tooShort': 'Mật khẩu phải có ít nhất 8 ký tự',
+    'passwordComplexity.lowercase': 'Mật khẩu phải chứa ít nhất 1 chữ thường',
+    'passwordComplexity.uppercase': 'Mật khẩu phải chứa ít nhất 1 chữ hoa',
+    'passwordComplexity.numeric': 'Mật khẩu phải chứa ít nhất 1 số',
+    'passwordComplexity.symbol': 'Mật khẩu phải chứa ít nhất 1 ký tự đặc biệt',
   }),
 });
 

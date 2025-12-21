@@ -272,7 +272,7 @@ const deleteEventByAdmin = async eventId => {
   // 1. Kiểm tra xem sự kiện có tồn tại không
   const event = await prisma.event.findUnique({
     where: { id: eventId },
-    select: { id: true }, // Chỉ cần biết nó tồn tại
+    select: { id: true, name: true, managerId: true }, // Lấy thêm name và managerId
   });
 
   if (!event) {
@@ -284,6 +284,23 @@ const deleteEventByAdmin = async eventId => {
   await prisma.event.delete({
     where: { id: eventId },
   });
+
+  // 3. Gửi thông báo cho Manager (nếu có)
+  if (event.managerId) {
+    const content = `Sự kiện "${event.name}" của bạn đã bị quản trị viên xóa.`;
+    
+    // Dùng try-catch để không làm ảnh hưởng luồng chính nếu lỗi
+    try {
+      notificationService.createNotification(
+        event.managerId,
+        content,
+        'EVENT', // Vẫn để EVENT để lưu lịch sử, dù link có thể 404
+        eventId,
+      );
+    } catch (error) {
+      console.error('[DeleteEvent] Lỗi gửi thông báo:', error);
+    }
+  }
 
   return; // Hoàn thành
 };
