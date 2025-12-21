@@ -127,6 +127,23 @@ const getEventMembers = async (req, res, next) => {
   }
 };
 
+// Endpoint search cho FE - trả về format đơn giản
+const searchEvents = async (req, res, next) => {
+  try {
+    const { search, limit = 5, status = 'APPROVED' } = req.query;
+
+    const result = await eventService.searchEvents({
+      search,
+      limit: parseInt(limit, 10),
+      status,
+    });
+
+    res.status(200).json({ data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getPublicEvents,
   getPublicEvent,
@@ -137,4 +154,5 @@ module.exports = {
   getEventMembers,
   getAllEvents,
   getMyEvent,
+  searchEvents,
 };

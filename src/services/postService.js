@@ -104,6 +104,21 @@ const createPost = async (eventId, userId, content, visibility = 'PUBLIC', media
 
   // 2. Xác định quyền hạn và trạng thái bài viết
   const isManager = event.managerId === userId;
+
+  // 3. (QUAN TRỌNG) Nếu không phải Manager, phải check CONFIRMED registration
+  if (!isManager) {
+    const registration = await prisma.eventRegistration.findFirst({
+      where: {
+        eventId: eventId,
+        userId: userId,
+        status: 'CONFIRMED',
+      },
+    });
+
+    if (!registration) {
+      throw createError(403, 'Bạn cần được duyệt tham gia sự kiện trước khi đăng bài');
+    }
+  }
   
   // Nếu là Manager -> Duyệt luôn (APPROVED). Nếu là Volunteer -> Chờ duyệt (PENDING)
   const initialStatus = isManager ? 'APPROVED' : 'PENDING';

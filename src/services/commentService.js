@@ -40,10 +40,27 @@ const listCommentsForPost = async (postId, options, userId) => {
 };
 
 const createComment = async (postId, userId, content, parentId = null) => {
-  // 1. Check quyền
+  // 1. Check quyền xem bài viết
   const post = await verifyPostAccessibility(postId, userId);
 
-  // 2. Nếu là Reply, kiểm tra comment cha có tồn tại không
+  // 2. (QUAN TRỌNG) Check user có quyền comment không (Manager hoặc CONFIRMED participant)
+  const isManager = post.event.managerId === userId;
+
+  if (!isManager) {
+    const registration = await prisma.eventRegistration.findFirst({
+      where: {
+        eventId: post.event.id,
+        userId: userId,
+        status: 'CONFIRMED',
+      },
+    });
+
+    if (!registration) {
+      throw createError(403, 'Bạn cần được duyệt tham gia sự kiện trước khi bình luận');
+    }
+  }
+
+  // 3. Nếu là Reply, kiểm tra comment cha có tồn tại không
   let parentComment = null;
   if (parentId) {
     parentComment = await prisma.comment.findUnique({

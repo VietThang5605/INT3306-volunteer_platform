@@ -463,6 +463,46 @@ const getAllEventsForAdmin = async (options) => {
   };
 };
 
+/**
+ * Search events cho FE - trả về format đơn giản
+ * GET /api/events/search?search=tuan&limit=5&status=APPROVED
+ */
+const searchEvents = async (options) => {
+  const { search, limit = 5, status = 'APPROVED' } = options;
+
+  const where = {};
+
+  if (status) {
+    where.status = status;
+  }
+
+  if (search) {
+    where.OR = [
+      { name: { contains: search, mode: 'insensitive' } },
+      { description: { contains: search, mode: 'insensitive' } },
+    ];
+  }
+
+  const events = await prisma.event.findMany({
+    where,
+    take: limit,
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      coverUrl: true,
+      startTime: true,
+      location: true,
+      category: {
+        select: { name: true },
+      },
+    },
+  });
+
+  return events;
+};
+
 module.exports = {
   listPublicEvents,
   getPublicEventById,
@@ -474,4 +514,5 @@ module.exports = {
   getEventByIdForAdmin,
   getEventByIdForManager,
   getAllEventsForAdmin,
+  searchEvents,
 };

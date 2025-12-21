@@ -39,6 +39,12 @@ router.get(
   eventController.getMyEvent
 );
 
+// Route search cho FE - không cần auth
+router.get(
+  '/search',
+  eventController.searchEvents
+);
+
 /**
  * @swagger
  * tags:
