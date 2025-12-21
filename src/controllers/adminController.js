@@ -85,16 +85,6 @@ const deleteEvent = async (req, res, next) => {
   }
 };
 
-const getEventDetail = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const event = await adminService.getEventDetail(id);
-    res.status(200).json(event);
-  } catch (error) {
-    next(error);
-  }
-};
-
 const getDashboardStats = async (req, res, next) => {
   try {
     const stats = await adminService.getDashboardStats();

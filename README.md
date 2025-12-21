@@ -167,6 +167,18 @@ POST /auth/forgot-password
 }
 ```
 
+### 12. Đặt lại mật khẩu
+```http
+POST /auth/reset-password
+```
+**Body:**
+```json
+{
+  "token": "reset_token_from_email",
+  "newPassword": "new_password123"
+}
+```
+
 ### 13. Xác thực email
 ```http
 GET /auth/verify-email?token=verification_token
@@ -299,21 +311,32 @@ GET /events/:id
 GET /events/manager
 ```
 **Headers:** `Authorization: Bearer <manager_token>`
-**Query params:** Tương tự như endpoint công khai
+**Query params:** 
+- `page`, `limit`: Phân trang
+- `status`: PENDING/APPROVED/REJECTED
 
-### 4. Lấy chi tiết sự kiện của Manager
+### 4. Lấy danh sách sự kiện của tôi (Manager)
+```http
+GET /events/me
+```
+**Headers:** `Authorization: Bearer <manager_token>`
+**Query params:** 
+- `page`, `limit`: Phân trang
+- `status`: PENDING/APPROVED/REJECTED
+
+### 5. Lấy chi tiết sự kiện của Manager
 ```http
 GET /events/manager/:id
 ```
 **Headers:** `Authorization: Bearer <manager_token>`
 
-### 5. Lấy tất cả sự kiện (Admin)
+### 6. Lấy tất cả sự kiện (Admin)
 ```http
 GET /events/admin
 ```
 **Headers:** `Authorization: Bearer <admin_token>`
 
-### 6. Tạo sự kiện mới (Manager)
+### 7. Tạo sự kiện mới (Manager)
 ```http
 POST /events
 ```
@@ -332,19 +355,19 @@ POST /events
 }
 ```
 
-### 7. Cập nhật sự kiện (Manager)
+### 8. Cập nhật sự kiện (Manager)
 ```http
 PATCH /events/:id
 ```
 **Headers:** `Authorization: Bearer <manager_token>`
 
-### 8. Xóa sự kiện (Manager)
+### 9. Xóa sự kiện (Manager)
 ```http
 DELETE /events/:id
 ```
 **Headers:** `Authorization: Bearer <manager_token>`
 
-### 9. Lấy danh sách thành viên sự kiện
+### 10. Lấy danh sách thành viên sự kiện
 ```http
 GET /events/:id/members
 ```
@@ -540,31 +563,33 @@ POST /events/:id/posts
 GET /events/:id/trending-posts
 ```
 
-### 4. Lấy chi tiết bài viết
-```http
-GET /posts/:id
-```
-**Headers:** `Authorization: Bearer <token>`
-
-### 5. Cập nhật bài viết
-```http
-PATCH /posts/:id
-```
-**Headers:** `Authorization: Bearer <token>`
-
-### 6. Xóa bài viết
+### 4. Xóa bài viết
 ```http
 DELETE /posts/:id
 ```
 **Headers:** `Authorization: Bearer <token>`
 
-### 8. Lấy bài viết trending toàn cục
+### 5. Like/Unlike bài viết
+```http
+POST /posts/:id/like
+```
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:**
+```json
+{
+  "isLiked": true,
+  "likesCount": 15
+}
+```
+
+### 6. Lấy bài viết trending toàn cục
 ```http
 GET /posts/trending
 ```
 Không cần authentication
 
-### 9. Cập nhật trạng thái bài viết (Admin/Manager)
+### 7. Cập nhật trạng thái bài viết (Admin/Manager)
 ```http
 POST /posts/:id/status
 ```
@@ -599,19 +624,13 @@ POST /posts/:id/comments
 }
 ```
 
-### 3. Cập nhật comment
-```http
-PATCH /comments/:id
-```
-**Headers:** `Authorization: Bearer <token>`
-
-### 4. Xóa comment
+### 3. Xóa comment
 ```http
 DELETE /comments/:id
 ```
 **Headers:** `Authorization: Bearer <token>`
 
-### 5. Like/Unlike comment
+### 4. Like/Unlike comment
 ```http
 POST /comments/:id/like
 ```
@@ -675,7 +694,7 @@ GET /notifications
 **Headers:** `Authorization: Bearer <token>`
 **Query params:**
 - `page`, `limit`: Phân trang
-- `isRead`: true/false
+- `filter`: all/unread
 
 **Response:**
 ```json
@@ -690,11 +709,12 @@ GET /notifications
       "createdAt": "2024-01-01T00:00:00Z"
     }
   ],
-  "pagination": {...}
+  "pagination": {...},
+  "unreadCount": 5
 }
 ```
 
-### 2. Đánh dấu đã đọc
+### 2. Đánh dấu một thông báo đã đọc
 ```http
 PATCH /notifications/:id/read
 ```
@@ -702,13 +722,7 @@ PATCH /notifications/:id/read
 
 ### 3. Đánh dấu tất cả đã đọc
 ```http
-PATCH /notifications/mark-all-read
-```
-**Headers:** `Authorization: Bearer <token>`
-
-### 4. Xóa thông báo
-```http
-DELETE /notifications/:id
+POST /notifications/read-all
 ```
 **Headers:** `Authorization: Bearer <token>`
 
@@ -716,11 +730,19 @@ DELETE /notifications/:id
 
 ## 📊 Dashboard (`/dashboard`)
 
-### 1. Lấy thống kê tổng quan (Admin)
+### 1. Lấy dữ liệu dashboard (theo role)
+```http
+GET /dashboard
+```
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:** Dữ liệu trả về khác nhau tùy theo vai trò (Admin, Manager, Volunteer)
+
+### 2. Lấy thống kê hệ thống (công khai)
 ```http
 GET /dashboard/stats
 ```
-**Headers:** `Authorization: Bearer <admin_token>`
+Không cần authentication
 
 **Response:**
 ```json
@@ -728,16 +750,9 @@ GET /dashboard/stats
   "totalUsers": 1000,
   "totalEvents": 50,
   "totalRegistrations": 500,
-  "totalPosts": 200,
-  "recentActivities": [...]
+  "totalPosts": 200
 }
 ```
-
-### 3. Lấy thống kê hệ thống
-```http
-GET /dashboard/stats
-```
-Không cần authentication - endpoint công khai
 
 ---
 
@@ -764,10 +779,12 @@ POST /push/subscribe
 **Body:**
 ```json
 {
-  "endpoint": "https://...",
-  "keys": {
-    "p256dh": "key",
-    "auth": "secret"
+  "subscription": {
+    "endpoint": "https://...",
+    "keys": {
+      "p256dh": "key",
+      "auth": "secret"
+    }
   }
 }
 ```
@@ -777,18 +794,10 @@ POST /push/subscribe
 POST /push/unsubscribe
 ```
 **Headers:** `Authorization: Bearer <token>`
-
-### 4. Gửi push notification (Admin)
-```http
-POST /push/send
-```
-**Headers:** `Authorization: Bearer <admin_token>`
 **Body:**
 ```json
 {
-  "title": "Tiêu đề",
-  "body": "Nội dung",
-  "targetUsers": ["user_id1", "user_id2"]
+  "endpoint": "https://..."
 }
 ```
 
@@ -798,7 +807,7 @@ POST /push/send
 
 ### 1. Duyệt sự kiện
 ```http
-PATCH /admin/events/:id/approve
+POST /admin/events/:id/approve
 ```
 **Headers:** `Authorization: Bearer <admin_token>`
 
@@ -817,6 +826,14 @@ DELETE /admin/events/:id
 ### 4. Xuất danh sách sự kiện
 ```http
 GET /admin/export/events?format=json
+```
+**Headers:** `Authorization: Bearer <admin_token>`
+**Query params:**
+- `format`: json/csv/xlsx
+
+### 5. Xuất danh sách người dùng
+```http
+GET /admin/export/users?format=json
 ```
 **Headers:** `Authorization: Bearer <admin_token>`
 **Query params:**
