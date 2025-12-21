@@ -304,13 +304,11 @@ const getDashboardStats = async () => {
     prisma.user.count({ where: { role: 'VOLUNTEER' } }),
     prisma.user.count({ where: { role: 'MANAGER' } }),
     prisma.user.count({ where: { role: 'ADMIN' } }),
-
     // Event Stats
     prisma.event.count(),
     prisma.event.count({ where: { status: 'PENDING' } }),
     prisma.event.count({ where: { status: 'APPROVED' } }),
     prisma.event.count({ where: { status: 'COMPLETED' } }),
-
     // Category Stats
     prisma.category.count(),
   ]);

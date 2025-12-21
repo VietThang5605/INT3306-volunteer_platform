@@ -6,6 +6,7 @@ const validate = require('../../middlewares/validate');
 const { eventIdSchema } = require('../../validators/event.validator');
 const { exportSchema } = require('../../validators/admin.validator');
 const adminController = require('../../controllers/adminController');
+const eventService = require('../../services/eventService');
 
 /**
  * @swagger

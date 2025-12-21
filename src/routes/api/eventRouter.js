@@ -46,6 +46,33 @@ router.get(
  *   description: Quản lý sự kiện và các hoạt động liên quan (đăng ký, bài viết)
  */
 
+
+
+router.get(
+  '/admin',
+  auth, // 1. Phải đăng nhập
+  permit('ADMIN'), // 2. Phải là Admin
+  validate(listManagerEventsSchema, 'query'), // 3. Validate phân trang/lọc (như Manager)
+  eventController.getAllEvents // 4. Controller mới
+);
+
+router.get(
+  '/manager',
+  auth, // 1. Phải đăng nhập
+  permit('MANAGER'), // 2. (Tùy chọn) Nếu muốn chặn Volunteer gọi API này thì uncomment
+  validate(listManagerEventsSchema, 'query'), // 3. Validate phân trang (page, limit...) & status
+  eventController.getMyEvents
+);
+
+router.get(
+  '/manager/:id',
+  auth,
+  permit('MANAGER'),
+  validate(eventIdSchema, 'params'),
+  eventController.getMyEvent
+);
+
+
 /**
  * @swagger
  * /events:

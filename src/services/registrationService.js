@@ -279,6 +279,23 @@ const updateRegistrationStatus = async (registrationId, managerId, newStatus) =>
     throw createError(400, `Đăng ký này đã ở trạng thái ${newStatus}`);
   }
 
+  // 3.5 (QUAN TRỌNG) Kiểm tra sức chứa nếu duyệt (CONFIRMED)
+  if (newStatus === 'CONFIRMED') {
+    const { capacity } = registration.event;
+    if (capacity) {
+      const currentConfirmed = await prisma.eventRegistration.count({
+        where: {
+          eventId: registration.eventId,
+          status: 'CONFIRMED',
+        },
+      });
+      
+      if (currentConfirmed >= capacity) {
+        throw createError(400, 'Sự kiện đã đủ số lượng người tham gia, không thể duyệt thêm.');
+      }
+    }
+  }
+
   // 4. Cập nhật trạng thái
   const updatedRegistration = await prisma.eventRegistration.update({
     where: { id: registrationId },
