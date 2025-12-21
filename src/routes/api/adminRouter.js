@@ -156,10 +156,24 @@ router.get(
  *       "404":
  *         description: Không tìm thấy sự kiện
  */
+
 router.delete(
   '/events/:id',
   validate(eventIdSchema, 'params'), // 1. Validate ID trên URL
   adminController.deleteEvent      // 2. Chạy logic
+);
+
+// Bổ sung route xem chi tiết sự kiện cho admin
+router.get(
+  '/events/:id',
+  validate(eventIdSchema, 'params'),
+  adminController.getEventDetail
+);
+
+// Bổ sung route dashboard stats cho admin
+router.get(
+  '/dashboard',
+  adminController.getDashboardStats
 );
 
 module.exports = router;

@@ -31,11 +31,39 @@ const createEvent = async (req, res, next) => {
     
     // 2. Lấy dữ liệu sự kiện từ body (đã được Joi validate)
     const eventData = req.body;
+    
+    // 3. Xử lý ảnh bìa (nếu có)
+    if (req.file) {
+      // Multer Cloudinary lưu URL vào `path` hoặc `secure_url`
+      eventData.coverUrl = req.file.path || req.file.secure_url;
+    }
+    // Xóa trường 'cover' (dư thừa từ frontend) để tránh lỗi Prisma
+    delete eventData.cover;
 
     const newEvent = await eventService.createEvent(eventData, managerId);
-    
     // 201 Created là status code chuẩn cho việc tạo mới thành công
     res.status(201).json({message: 'Tạo sự kiện thành công', event: newEvent});
+  } catch (error) {
+    next(error);
+  }
+};
+const getAllEvents = async (req, res, next) => {
+  try {
+    const options = req.query; // { page, limit, status, search }
+    // Gọi service
+    const result = await eventService.getAllEventsForAdmin(options);
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getMyEvent = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const managerId = req.user.id;
+    const event = await eventService.getEventByIdForManager(id, managerId);
+    res.status(200).json(event);
   } catch (error) {
     next(error);
   }
@@ -107,4 +135,6 @@ module.exports = {
   deleteEvent,
   getMyEvents,
   getEventMembers,
+  getAllEvents,
+  getMyEvent,
 };

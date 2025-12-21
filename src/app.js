@@ -27,7 +27,7 @@ app.use(
   swaggerUi.setup(swaggerSpec, {
     customCss: '.swagger-ui .topbar { display: none }', // Ẩn topbar của Swagger
     customSiteTitle: 'VolunteerHub API Docs',
-  })
+  }),
 );
 
 app.use((req, res, next) => {

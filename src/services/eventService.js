@@ -310,6 +310,151 @@ const getEventMembers = async (eventId, options) => {
   };
 };
 
+// --- Thêm các hàm từ imported-thang ---
+
+const getEventByIdForAdmin = async (eventId) => {
+  try {
+    const [event, totalRegistrations] = await prisma.$transaction([
+      prisma.event.findUnique({
+        where: { id: eventId },
+        include: {
+          category: {
+            select: { id: true, name: true },
+          },
+          manager: {
+            select: { id: true, fullName: true, avatarUrl: true, email: true, phoneNumber: true },
+          },
+          registrations: {
+            where: { status: 'CONFIRMED' },
+            select: { id: true },
+          },
+        },
+      }),
+      prisma.eventRegistration.count({
+        where: { eventId: eventId },
+      }),
+    ]);
+
+    if (!event) {
+      throw createError(404, 'Không tìm thấy sự kiện');
+    }
+
+    // Map data
+    const { registrations, ...rest } = event;
+    return {
+      ...rest,
+      participantCount: registrations.length,
+      totalRegistrations,
+    };
+  } catch (error) {
+    console.error("Error in getEventByIdForAdmin:", error);
+    throw error;
+  }
+};
+
+const getEventByIdForManager = async (eventId, managerId) => {
+  try {
+    const event = await prisma.event.findUnique({
+      where: { id: eventId },
+      include: {
+        category: {
+          select: { id: true, name: true },
+        },
+        manager: {
+          select: { id: true, fullName: true, avatarUrl: true, email: true, phoneNumber: true },
+        },
+        registrations: {
+          select: { id: true },
+        },
+      },
+    });
+
+    if (!event) {
+      throw createError(404, 'Không tìm thấy sự kiện');
+    }
+
+    if (event.managerId !== managerId) {
+      throw createError(403, 'Bạn không có quyền truy cập sự kiện này');
+    }
+
+    // Map data
+    const { registrations, ...rest } = event;
+    return {
+      ...rest,
+      participantCount: registrations.length,
+    };
+  } catch (error) {
+    console.error("Error in getEventByIdForManager:", error);
+    throw error;
+  }
+};
+
+const getAllEventsForAdmin = async (options) => {
+  const page = parseInt(options.page, 10) || 1;
+  const limit = parseInt(options.limit, 10) || 10;
+  const skip = (page - 1) * limit;
+
+  // 1. Xử lý phần Lọc (Filter)
+  const where = {};
+
+  // Lọc theo trạng thái
+  if (options.status) {
+    where.status = options.status;
+  }
+
+  // Tìm kiếm theo tên
+  if (options.search) {
+    where.name = {
+      contains: options.search,
+      mode: 'insensitive',
+    };
+  }
+
+  // 2. Query Database
+  const [events, total] = await prisma.$transaction([
+    prisma.event.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        category: true,
+        manager: {
+          select: { id: true, fullName: true, email: true, avatarUrl: true },
+        },
+        registrations: {
+          where: { status: 'CONFIRMED' },
+          select: { id: true },
+        },
+      },
+    }),
+    prisma.event.count({ where }),
+  ]);
+
+  const totalPages = Math.ceil(total / limit);
+
+  // Map data
+  const data = events.map(event => {
+    const { registrations, ...rest } = event;
+    return {
+      ...rest,
+      participantCount: registrations.length,
+    };
+  });
+
+  return {
+    data: data,
+    pagination: {
+      totalItems: total,
+      totalPages,
+      currentPage: page,
+      limit,
+    },
+  };
+};
+
+// --- Kết thúc phần thêm ---
+
 module.exports = {
   listPublicEvents,
   getPublicEventById,
@@ -318,4 +463,7 @@ module.exports = {
   deleteEvent,
   getEventsByManager,
   getEventMembers,
+  getEventByIdForAdmin,
+  getEventByIdForManager,
+  getAllEventsForAdmin,
 };

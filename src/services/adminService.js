@@ -3,9 +3,14 @@ const createError = require('http-errors');
 const { Parser } = require('json2csv');
 const ExcelJS = require('exceljs');
 // 1. Import service mới
-const notificationService = require('./notificationService'); 
+const notificationService = require('./notificationService');
+const eventService = require('./eventService');
 
-const approveEvent = async (eventId) => {
+const getEventDetail = async eventId => {
+  return await eventService.getEventByIdForAdmin(eventId);
+};
+
+const approveEvent = async eventId => {
   // 1. & 2. (Giữ nguyên) Kiểm tra event và status ...
   const event = await prisma.event.findUnique({
     where: { id: eventId },
@@ -37,12 +42,12 @@ const approveEvent = async (eventId) => {
   // Kích hoạt thông báo mà không cần "await"
   if (updatedEvent && updatedEvent.managerId) {
     const content = `Sự kiện "${updatedEvent.name}" của bạn đã được quản trị viên duyệt.`;
-    
+
     notificationService.createNotification(
       updatedEvent.managerId,
       content,
       'EVENT',
-      updatedEvent.id
+      updatedEvent.id,
     );
   }
 
@@ -50,7 +55,7 @@ const approveEvent = async (eventId) => {
   return updatedEvent;
 };
 
-const exportEvents = async (format) => {
+const exportEvents = async format => {
   // 1. (QUAN TRỌNG - SỬA LỖI) Code phòng thủ:
   // Đảm bảo `format` luôn có giá trị hợp lệ, mặc định là 'json'.
   const exportFormat = format || 'json';
@@ -74,7 +79,7 @@ const exportEvents = async (format) => {
   });
 
   // 3. Chuyển đổi dữ liệu sang dạng "phẳng" (flat)
-  const flatData = events.map((event) => ({
+  const flatData = events.map(event => ({
     id: event.id,
     name: event.name,
     status: event.status,
@@ -115,7 +120,7 @@ const exportEvents = async (format) => {
       { label: 'Ngày tạo', value: 'createdAt' },
       { label: 'Mô tả', value: 'description' },
     ];
-    
+
     const json2csvParser = new Parser({ fields, withBOM: true });
     const csv = json2csvParser.parse(flatData);
 
@@ -130,7 +135,7 @@ const exportEvents = async (format) => {
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'VolunteerHub';
     workbook.created = new Date();
-    
+
     const worksheet = workbook.addWorksheet('Events');
 
     worksheet.columns = [
@@ -148,14 +153,14 @@ const exportEvents = async (format) => {
     worksheet.getRow(1).font = { bold: true };
     worksheet.getRow(1).fill = {
       type: 'pattern',
-      pattern:'solid',
-      fgColor:{ argb:'FFDDDDDD' }
+      pattern: 'solid',
+      fgColor: { argb: 'FFDDDDDD' },
     };
 
     worksheet.addRows(flatData);
 
     const buffer = await workbook.xlsx.writeBuffer();
-    
+
     return {
       contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       data: buffer,
@@ -163,7 +168,7 @@ const exportEvents = async (format) => {
   }
 };
 
-const exportUsers = async (format) => {
+const exportUsers = async format => {
   // 1. (QUAN TRỌNG) Code phòng thủ
   const exportFormat = format || 'json';
 
@@ -184,7 +189,7 @@ const exportUsers = async (format) => {
       _count: {
         select: {
           managedEvents: true, // Số SK quản lý (cho MANAGER)
-          eventRegs: true,     // Số SK đăng ký (cho VOLUNTEER)
+          eventRegs: true, // Số SK đăng ký (cho VOLUNTEER)
         },
       },
     },
@@ -194,7 +199,7 @@ const exportUsers = async (format) => {
   });
 
   // 3. Chuyển đổi dữ liệu sang dạng "phẳng" (flat)
-  const flatData = users.map((user) => ({
+  const flatData = users.map(user => ({
     id: user.id,
     fullName: user.fullName,
     email: user.email,
@@ -247,10 +252,10 @@ const exportUsers = async (format) => {
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'VolunteerHub';
     const worksheet = workbook.addWorksheet('Users');
-    
+
     // Gán cột (lấy từ `fields` ở trên)
     worksheet.columns = fields.map(f => ({ header: f.label, key: f.key, width: f.width }));
-    
+
     worksheet.getRow(1).font = { bold: true };
     worksheet.addRows(flatData);
 
@@ -262,7 +267,7 @@ const exportUsers = async (format) => {
   }
 };
 
-const deleteEventByAdmin = async (eventId) => {
+const deleteEventByAdmin = async eventId => {
   // 1. Kiểm tra xem sự kiện có tồn tại không
   const event = await prisma.event.findUnique({
     where: { id: eventId },
@@ -282,9 +287,58 @@ const deleteEventByAdmin = async (eventId) => {
   return; // Hoàn thành
 };
 
+const getDashboardStats = async () => {
+  const [
+    totalUsers,
+    totalVolunteers,
+    totalManagers,
+    totalAdmins,
+    totalEvents,
+    pendingEvents,
+    approvedEvents,
+    completedEvents,
+    totalCategories,
+  ] = await prisma.$transaction([
+    // User Stats
+    prisma.user.count(),
+    prisma.user.count({ where: { role: 'VOLUNTEER' } }),
+    prisma.user.count({ where: { role: 'MANAGER' } }),
+    prisma.user.count({ where: { role: 'ADMIN' } }),
+
+    // Event Stats
+    prisma.event.count(),
+    prisma.event.count({ where: { status: 'PENDING' } }),
+    prisma.event.count({ where: { status: 'APPROVED' } }),
+    prisma.event.count({ where: { status: 'COMPLETED' } }),
+
+    // Category Stats
+    prisma.category.count(),
+  ]);
+
+  return {
+    users: {
+      total: totalUsers,
+      volunteers: totalVolunteers,
+      managers: totalManagers,
+      admins: totalAdmins,
+    },
+    events: {
+      total: totalEvents,
+      pending: pendingEvents,
+      approved: approvedEvents,
+      completed: completedEvents,
+    },
+    categories: {
+      total: totalCategories,
+    },
+  };
+};
+
 module.exports = {
   approveEvent,
   exportEvents,
   exportUsers,
-  deleteEventByAdmin
+  deleteEventByAdmin,
+  getEventDetail,
+  getDashboardStats,
 };

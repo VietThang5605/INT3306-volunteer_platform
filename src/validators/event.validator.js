@@ -8,13 +8,18 @@ const listEventsSchema = Joi.object({
 
   // Lọc (Tùy chọn)
   categoryId: Joi.number().integer().min(1).optional(),
-  
+
   // Lọc thời gian: 'upcoming' (sắp diễn ra), 'past' (đã diễn ra)
   time: Joi.string().valid('upcoming', 'past').optional(),
-  
+
   // Sắp xếp
   sortBy: Joi.string().valid('startTime', 'createdAt').default('createdAt'),
   order: Joi.string().valid('asc', 'desc').default('desc'),
+});
+
+const listManagerEventsSchema = listEventsSchema.keys({
+  status: Joi.string().valid('DRAFT', 'PENDING', 'APPROVED', 'CANCELLED', 'COMPLETED').optional(),
+  search: Joi.string().optional().allow(''),
 });
 
 const eventIdSchema = Joi.object({
@@ -31,14 +36,15 @@ const createEventSchema = Joi.object({
   }),
   description: Joi.string().optional().allow(null, ''),
   location: Joi.string().optional().allow(null, ''),
-  
+
   // Yêu cầu thời gian là chuỗi ISO (YYYY-MM-DDTHH:mm:ssZ)
   startTime: Joi.date().iso().required().messages({
     'date.format': 'Thời gian bắt đầu (startTime) phải là chuỗi ISO 8601',
     'any.required': 'Thời gian bắt đầu là bắt buộc',
   }),
-  
-  endTime: Joi.date().iso()
+
+  endTime: Joi.date()
+    .iso()
     .greater(Joi.ref('startTime')) // Phải sau startTime
     .required()
     .messages({
@@ -48,7 +54,8 @@ const createEventSchema = Joi.object({
 
   categoryId: Joi.number().integer().min(1).optional().allow(null),
   capacity: Joi.number().integer().min(1).optional().allow(null),
-  
+  cover: Joi.any().optional(),
+
   // Bất kỳ trường nào khác (như status, managerId) sẽ tự động bị Joi lọc bỏ
 });
 
@@ -58,12 +65,12 @@ const updateEventSchema = Joi.object({
   }),
   description: Joi.string().optional().allow(null, ''),
   location: Joi.string().optional().allow(null, ''),
-  
+
   // Dùng Joi.date() (không .iso()) để linh hoạt
   startTime: Joi.date().optional(),
-  
+
   endTime: Joi.date().optional(), // Logic so sánh (greater) sẽ ở service
-  
+
   categoryId: Joi.number().integer().min(1).optional().allow(null),
   capacity: Joi.number().integer().min(1).optional().allow(null),
 })
@@ -72,9 +79,9 @@ const updateEventSchema = Joi.object({
     'object.min': 'Phải cung cấp ít nhất một trường để cập nhật',
   });
 
-
 module.exports = {
   listEventsSchema,
+  listManagerEventsSchema,
   eventIdSchema,
   createEventSchema,
   updateEventSchema,

@@ -211,15 +211,16 @@ const listRegistrationsForEvent = async (eventId, managerId, options) => {
         registeredAt: 'asc', // Ưu tiên người đăng ký sớm
       },
       include: {
-        // Lấy thông tin an toàn của người đăng ký
-        user: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true, // Manager có thể cần email để liên hệ
-            avatarUrl: true,
+          // Lấy thông tin an toàn của người đăng ký
+          user: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true, // Manager có thể cần email để liên hệ
+              phoneNumber: true, // Thêm phoneNumber như imported-thang
+              avatarUrl: true,
+            },
           },
-        },
       },
     }),
     prisma.eventRegistration.count({ where }),
@@ -255,8 +256,12 @@ const updateRegistrationStatus = async (registrationId, managerId, newStatus) =>
       id: true,
       status: true,
       userId: true, // 👈 Lấy userId để gửi thông báo
+      eventId: true, // Thêm eventId để check capacity
       event: {
-        select: { name: true }, // 👈 Lấy tên sự kiện để gửi thông báo
+        select: {
+          name: true, // 👈 Lấy tên sự kiện để gửi thông báo
+          capacity: true, // Thêm capacity để check sức chứa
+        },
       },
     },
   });

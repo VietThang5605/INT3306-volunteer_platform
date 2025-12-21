@@ -3,13 +3,40 @@ const router = express.Router();
 
 const { auth, permit } = require('../../middlewares/auth');
 const validate = require('../../middlewares/validate');
-const { listEventsSchema, eventIdSchema, createEventSchema, updateEventSchema } = require('../../validators/event.validator');
+const { listEventsSchema, listManagerEventsSchema, eventIdSchema, createEventSchema, updateEventSchema } = require('../../validators/event.validator');
 const { listRegistrationsSchema } = require('../../validators/registration.validator');
 const { listPostsSchema } = require('../../validators/post.validator');
 const upload = require('../../config/cloudinary');
 const postController = require('../../controllers/postController');
 const eventController = require('../../controllers/eventController');
 const registrationController = require('../../controllers/registrationController');
+
+// Route cho admin lấy tất cả sự kiện
+router.get(
+  '/admin',
+  auth,
+  permit('ADMIN'),
+  validate(listManagerEventsSchema, 'query'),
+  eventController.getAllEvents
+);
+
+// Route cho manager lấy danh sách sự kiện của mình
+router.get(
+  '/manager',
+  auth,
+  permit('MANAGER'),
+  validate(listManagerEventsSchema, 'query'),
+  eventController.getMyEvents
+);
+
+// Route cho manager lấy chi tiết sự kiện mình quản lý
+router.get(
+  '/manager/:id',
+  auth,
+  permit('MANAGER'),
+  validate(eventIdSchema, 'params'),
+  eventController.getMyEvent
+);
 
 /**
  * @swagger
@@ -227,10 +254,11 @@ router.get(
  */
 router.post(
   '/',
-  auth, 
-  permit('MANAGER'), 
+  auth,
+  permit('MANAGER'),
+  upload.single('cover'), // Parse ảnh bìa
   validate(createEventSchema),
-  eventController.createEvent 
+  eventController.createEvent
 );
 
 /**
