@@ -287,6 +287,30 @@ const deleteEventByAdmin = async eventId => {
   return; // Hoàn thành
 };
 
+const deleteUserByAdmin = async userId => {
+  // 1. Kiểm tra user có tồn tại không
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, role: true },
+  });
+
+  if (!user) {
+    throw createError(404, 'Không tìm thấy người dùng');
+  }
+
+  // 2. Kiểm tra role (Không cho phép xóa Admin)
+  if (user.role === 'ADMIN') {
+    throw createError(403, 'Không thể xóa tài khoản Admin');
+  }
+
+  // 3. Thực hiện xóa
+  await prisma.user.delete({
+    where: { id: userId },
+  });
+
+  return;
+};
+
 const getDashboardStats = async () => {
   const [
     totalUsers,
@@ -339,4 +363,5 @@ module.exports = {
   deleteEventByAdmin,
   getEventDetail,
   getDashboardStats,
+  deleteUserByAdmin,
 };

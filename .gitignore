@@ -3,4 +3,4 @@ prisma/migrations
 .env
 logs
 test
-# pgdata
+pgdata

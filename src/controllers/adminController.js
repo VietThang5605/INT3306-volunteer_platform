@@ -120,6 +120,17 @@ const updateUserStatus = async (req, res, next) => {
   }
 };
 
+
+const deleteUser = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    await adminService.deleteUserByAdmin(id);
+    res.status(200).json({ message: 'Xóa người dùng thành công' });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   approveEvent,
   listUsers,
@@ -129,4 +140,5 @@ module.exports = {
   getEventDetail,
   getDashboardStats,
   updateUserStatus,
+  deleteUser,
 };

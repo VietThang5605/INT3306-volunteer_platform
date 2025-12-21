@@ -193,4 +193,11 @@ router.patch(
   adminController.updateUserStatus
 );
 
+// Bổ sung route xóa user
+router.delete(
+  '/users/:id',
+  validate(userIdSchema, 'params'),
+  adminController.deleteUser
+);
+
 module.exports = router;
