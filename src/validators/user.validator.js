@@ -26,8 +26,16 @@ const updateUserSchema = Joi.object({
     'object.min': 'Phải cung cấp ít nhất một trường (role hoặc isActive) để cập nhật.',
   });
 
+const updateUserStatusSchema = Joi.object({
+  isActive: Joi.boolean().required().messages({
+    'any.required': 'Trạng thái hoạt động (isActive) là bắt buộc',
+    'boolean.base': 'Trạng thái hoạt động phải là kiểu boolean',
+  }),
+});
+
 module.exports = {
   listUsersSchema,
   updateUserSchema,
   userIdSchema,
+  updateUserStatusSchema,
 };

@@ -5,7 +5,7 @@ const { auth, permit } = require('../../middlewares/auth');
 const validate = require('../../middlewares/validate');
 const { eventIdSchema } = require('../../validators/event.validator');
 const { exportSchema } = require('../../validators/admin.validator');
-const { listUsersSchema } = require('../../validators/user.validator');
+const { listUsersSchema, updateUserStatusSchema, userIdSchema } = require('../../validators/user.validator');
 const adminController = require('../../controllers/adminController');
 const eventService = require('../../services/eventService');
 
@@ -183,6 +183,14 @@ router.get(
   '/users',
   validate(listUsersSchema, 'query'),
   adminController.listUsers
+);
+
+// Bổ sung route cập nhật trạng thái user (Khóa/Mở khóa)
+router.patch(
+  '/users/:id/status',
+  validate(userIdSchema, 'params'),
+  validate(updateUserStatusSchema),
+  adminController.updateUserStatus
 );
 
 module.exports = router;

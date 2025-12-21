@@ -105,6 +105,21 @@ const getDashboardStats = async (req, res, next) => {
   }
 };
 
+const updateUserStatus = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { isActive } = req.body;
+    const adminId = req.user.id;
+
+    // Reuse userService.updateUserById but only pass isActive
+    const updatedUser = await userService.updateUserById(id, { isActive }, adminId);
+
+    res.status(200).json(updatedUser);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   approveEvent,
   listUsers,
@@ -113,4 +128,5 @@ module.exports = {
   deleteEvent,
   getEventDetail,
   getDashboardStats,
+  updateUserStatus,
 };
