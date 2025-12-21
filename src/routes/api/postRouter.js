@@ -5,6 +5,7 @@ const { auth } = require('../../middlewares/auth');
 const validate = require('../../middlewares/validate');
 const { postIdSchema, updatePostStatusSchema } = require('../../validators/post.validator');
 const postController = require('../../controllers/postController');
+const { postCreationLimiter, interactionLimiter } = require('../../middlewares/postLimiter');
 const {
   listCommentsSchema,
   createCommentSchema,
@@ -101,6 +102,7 @@ router.delete(
  */
 router.post(
   '/:id/like',
+  interactionLimiter, // Thêm rate limiter
   validate(postIdSchema, 'params'), // 1. Validate ID post
   postController.togglePostLike   // 2. Chạy logic
 );
@@ -197,6 +199,7 @@ router.get(
  */
 router.post(
   '/:id/comments',
+  postCreationLimiter, // Thêm rate limiter cho comment
   validate(postIdSchema, 'params'), // 1. Validate ID post
   validate(createCommentSchema),   // 2. Validate body
   commentController.createComment

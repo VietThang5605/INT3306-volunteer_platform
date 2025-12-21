@@ -7,6 +7,7 @@ const { listEventsSchema, listManagerEventsSchema, eventIdSchema, createEventSch
 const { listRegistrationsSchema } = require('../../validators/registration.validator');
 const { listPostsSchema } = require('../../validators/post.validator');
 const upload = require('../../config/cloudinary');
+const { postCreationLimiter } = require('../../middlewares/postLimiter');
 const postController = require('../../controllers/postController');
 const eventController = require('../../controllers/eventController');
 const registrationController = require('../../controllers/registrationController');
@@ -154,7 +155,7 @@ router.get(
   '/me',
   auth,
   permit('MANAGER'),
-  validate(listEventsSchema, 'query'),
+  validate(listManagerEventsSchema, 'query'),
   eventController.getMyEvents
 );
 
@@ -534,8 +535,9 @@ router.get(
 router.post(
   '/:id/posts',
   auth, // 1. Phải đăng nhập
-  validate(eventIdSchema, 'params'), // 2. Validate ID sự kiện
-  // validate(createPostSchema),      // 3. Validate body
+  postCreationLimiter, // 2. Rate limiter cho posts
+  validate(eventIdSchema, 'params'), // 3. Validate ID sự kiện
+  // validate(createPostSchema),      // 4. Validate body
   upload.array('media', 5),
   postController.createPost
 );
