@@ -5,8 +5,8 @@ const listUsersSchema = Joi.object({
   limit: Joi.number().integer().min(1).max(100).default(10),
   
   // (Tùy chọn mở rộng sau này)
-  // role: Joi.string().valid('VOLUNTEER', 'MANAGER', 'ADMIN'),
-  // search: Joi.string().trim(),
+  role: Joi.string().valid('VOLUNTEER', 'MANAGER', 'ADMIN'),
+  search: Joi.string().trim().allow(''),
 });
 
 const userIdSchema = Joi.object({

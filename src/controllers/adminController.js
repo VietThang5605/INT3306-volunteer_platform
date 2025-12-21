@@ -1,5 +1,16 @@
 const adminService = require('../services/adminService');
 const eventService = require('../services/eventService');
+const userService = require('../services/userService');
+
+const listUsers = async (req, res, next) => {
+  try {
+    const options = req.query;
+    const result = await userService.listUsers(options);
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
 
 const approveEvent = async (req, res, next) => {
   try {
@@ -96,6 +107,7 @@ const getDashboardStats = async (req, res, next) => {
 
 module.exports = {
   approveEvent,
+  listUsers,
   exportEvents,
   exportUsers,
   deleteEvent,

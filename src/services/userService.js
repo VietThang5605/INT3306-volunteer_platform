@@ -14,9 +14,24 @@ const listUsers = async options => {
   const skip = (page - 1) * limit;
   const take = limit;
 
+  // Xây dựng bộ lọc (where)
+  const where = {};
+
+  if (options.role && ['VOLUNTEER', 'MANAGER', 'ADMIN'].includes(options.role)) {
+    where.role = options.role;
+  }
+
+  if (options.search) {
+    where.OR = [
+      { fullName: { contains: options.search, mode: 'insensitive' } },
+      { email: { contains: options.search, mode: 'insensitive' } },
+    ];
+  }
+
   // 3. Dùng $transaction
   const [users, total] = await prisma.$transaction([
     prisma.user.findMany({
+      where, // Áp dụng bộ lọc
       skip,
       take,
       select: {
@@ -35,7 +50,7 @@ const listUsers = async options => {
         createdAt: 'desc',
       },
     }),
-    prisma.user.count(),
+    prisma.user.count({ where }), // Đếm dựa trên bộ lọc
   ]);
 
   // 4. Tính toán thông tin phân trang
