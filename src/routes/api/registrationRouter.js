@@ -189,4 +189,38 @@ router.patch(
   registrationController.updateRegistrationStatus // 6. Chạy logic
 );
 
+/**
+ * @swagger
+ * /registrations/{id}/remove:
+ *   delete:
+ *     summary: (Manager) Xóa một Volunteer khỏi danh sách tham gia
+ *     tags: [Registrations]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         required: true
+ *         description: ID của đơn đăng ký
+ *     responses:
+ *       "204":
+ *         description: Xóa thành công
+ *       "401":
+ *         description: Chưa xác thực
+ *       "403":
+ *         description: Không có quyền (không phải Manager của sự kiện)
+ *       "404":
+ *         description: Không tìm thấy đơn đăng ký
+ */
+router.delete(
+  '/:id/remove',
+  auth, // 1. Phải đăng nhập
+  permit('MANAGER'), // 2. Phải là Manager
+  validate(registrationIdSchema, 'params'), // 3. Validate ID
+  registrationController.removeVolunteer // 4. Chạy logic
+);
+
 module.exports = router;

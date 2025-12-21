@@ -98,6 +98,20 @@ const getMyChannels = async (req, res, next) => {
   }
 };
 
+const removeVolunteer = async (req, res, next) => {
+  try {
+    const { id: registrationId } = req.params; // 1. Lấy ID đăng ký
+    const managerId = req.user.id;            // 2. Lấy ID Manager
+
+    await registrationService.removeVolunteer(registrationId, managerId);
+    
+    // 204 No Content
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getRegistrations,
   createRegistration,
@@ -105,4 +119,5 @@ module.exports = {
   getRegistrationsForEvent,
   updateRegistrationStatus,
   getMyChannels,
+  removeVolunteer,
 };

@@ -453,6 +453,54 @@ const getMyChannels = async (userId, options) => {
   };
 };
 
+const removeVolunteer = async (registrationId, managerId) => {
+  // 1. Kiểm tra sở hữu sự kiện
+  const registration = await prisma.eventRegistration.findUnique({
+    where: { id: registrationId },
+    include: {
+      event: {
+        select: {
+          id: true,
+          name: true,
+          managerId: true,
+        },
+      },
+      user: {
+        select: {
+          id: true,
+          fullName: true,
+        },
+      },
+    },
+  });
+
+  if (!registration) {
+    throw createError(404, 'Không tìm thấy đăng ký');
+  }
+
+  // 2. Chỉ Manager của sự kiện mới được quyền xóa
+  if (registration.event.managerId !== managerId) {
+    throw createError(403, 'Bạn không có quyền xóa thành viên khỏi sự kiện này');
+  }
+
+  // 3. Thực hiện xóa
+  await prisma.eventRegistration.delete({
+    where: { id: registrationId },
+  });
+
+  // 4. 🔔 Gửi thông báo cho Volunteer bị xóa
+  const content = `Bạn đã bị xóa khỏi sự kiện "${registration.event.name}" bởi người quản lý.`;
+  
+  notificationService.createNotification(
+    registration.userId,
+    content,
+    'REGISTRATION', // Hoặc 'EVENT'
+    registration.eventId // Link trỏ về sự kiện để xem chi tiết
+  ).catch(console.error);
+
+  return;
+};
+
 module.exports = {
   listRegistrations,
   createRegistration,
@@ -460,4 +508,5 @@ module.exports = {
   listRegistrationsForEvent,
   updateRegistrationStatus,
   getMyChannels,
+  removeVolunteer,
 };
