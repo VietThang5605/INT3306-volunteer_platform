@@ -75,6 +75,10 @@ const getPublicEventById = async (eventId) => {
       manager: {
         select: { id: true, fullName: true, avatarUrl: true }, // Thông tin an toàn
       },
+      registrations: {
+        where: { status: 'CONFIRMED' },
+        select: { id: true },
+      },
     },
   });
 
@@ -82,7 +86,12 @@ const getPublicEventById = async (eventId) => {
     throw createError(404, 'Không tìm thấy sự kiện');
   }
 
-  return event;
+  // Tính toán số lượng participant
+  const { registrations, ...rest } = event;
+  return {
+    ...rest,
+    participantCount: registrations.length,
+  };
 };
 
 const getEventByIdForAdmin = async (eventId) => {
@@ -137,6 +146,7 @@ const getEventByIdForManager = async (eventId, managerId) => {
           select: { id: true, fullName: true, avatarUrl: true, email: true, phoneNumber: true },
         },
         registrations: {
+          where: { status: 'CONFIRMED' },
           select: { id: true },
         },
       },
@@ -292,8 +302,10 @@ const getEventsByManager = async (managerId, options) => {
         category: true,
         _count: {
           select: {
-            registrations: true,
-            posts: true, // Đếm số bài viết
+            registrations: {
+              where: { status: 'CONFIRMED' },
+            },
+            posts: true,
           },
         },
         // Lấy bài post mới nhất
