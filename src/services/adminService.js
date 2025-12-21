@@ -2,6 +2,7 @@ const prisma = require('../prisma/client');
 const createError = require('http-errors');
 const { Parser } = require('json2csv');
 const ExcelJS = require('exceljs');
+const argon2 = require('argon2'); // Import argon2
 // 1. Import service mới
 const notificationService = require('./notificationService');
 const eventService = require('./eventService');
@@ -311,6 +312,42 @@ const deleteUserByAdmin = async userId => {
   return;
 };
 
+const createManager = async ({ fullName, email, password }) => {
+  // 1. Kiểm tra email tồn tại
+  const existingUser = await prisma.user.findUnique({ where: { email } });
+  if (existingUser) {
+    throw createError(409, 'Email đã được sử dụng');
+  }
+
+  // 2. Hash mật khẩu
+  const hashedPassword = await argon2.hash(password);
+
+  // 3. Tạo user mới (ACTIVE và VERIFIED luôn)
+  const newUser = await prisma.user.create({
+    data: {
+      fullName,
+      email,
+      passwordHash: hashedPassword,
+      role: 'MANAGER',
+      isEmailVerified: true,
+      isActive: true,
+      phoneNumber: 'null',
+      location: 'null',
+      dob: '1979-12-31T17:00:00Z',
+    },
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      role: true,
+      isActive: true,
+      createdAt: true,
+    },
+  });
+
+  return newUser;
+};
+
 const getDashboardStats = async () => {
   const [
     totalUsers,
@@ -364,4 +401,5 @@ module.exports = {
   getEventDetail,
   getDashboardStats,
   deleteUserByAdmin,
+  createManager,
 };

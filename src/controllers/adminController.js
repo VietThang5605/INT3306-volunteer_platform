@@ -131,6 +131,16 @@ const deleteUser = async (req, res, next) => {
   }
 };
 
+const createManager = async (req, res, next) => {
+  try {
+    const { fullName, email, password } = req.body;
+    const user = await adminService.createManager({ fullName, email, password });
+    res.status(201).json(user);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   approveEvent,
   listUsers,
@@ -141,4 +151,5 @@ module.exports = {
   getDashboardStats,
   updateUserStatus,
   deleteUser,
+  createManager,
 };

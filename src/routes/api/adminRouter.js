@@ -5,7 +5,7 @@ const { auth, permit } = require('../../middlewares/auth');
 const validate = require('../../middlewares/validate');
 const { eventIdSchema } = require('../../validators/event.validator');
 const { exportSchema } = require('../../validators/admin.validator');
-const { listUsersSchema, updateUserStatusSchema, userIdSchema } = require('../../validators/user.validator');
+const { listUsersSchema, updateUserStatusSchema, userIdSchema, createManagerSchema } = require('../../validators/user.validator');
 const adminController = require('../../controllers/adminController');
 const eventService = require('../../services/eventService');
 
@@ -198,6 +198,15 @@ router.delete(
   '/users/:id',
   validate(userIdSchema, 'params'),
   adminController.deleteUser
+);
+
+
+
+// Bổ sung route tạo Manager
+router.post(
+  '/users',
+  validate(createManagerSchema),
+  adminController.createManager
 );
 
 module.exports = router;
