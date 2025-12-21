@@ -27,7 +27,6 @@ const validate = (schema, source = 'body') => {
         .join(', '); // Nối các lỗi lại, ví dụ: "Lỗi A, Lỗi B"
 
       // 4. Gửi lỗi 400 (Bad Request) đến errorHandler
-      console.error('Validation Error:', errorMessage); // Ghi log lỗi
       return next(createError(400, errorMessage));
     }
 

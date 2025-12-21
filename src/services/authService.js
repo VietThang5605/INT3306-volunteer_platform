@@ -172,25 +172,28 @@ const loginUser = async ({ email, password, device, ip, rememberMe = true }) => 
 };
 
 const logoutUser = async (tokenString, userId) => {
-  // 1. Tìm token trong database bằng chính chuỗi token
+  // 1. Băm token thô để tìm trong DB (vì DB lưu HASH)
+  const hashedToken = hashToken(tokenString);
+
+  // 2. Tìm token trong database bằng HASH
   const refreshToken = await prisma.refreshToken.findUnique({
-    where: { token: tokenString },
+    where: { token: hashedToken },
   });
 
-  // 2. Kiểm tra
+  // 3. Kiểm tra
   if (!refreshToken || refreshToken.revoked) {
     // Nếu token không tồn tại, hoặc đã bị thu hồi
     // Ném lỗi 404
     throw createError(404, 'Refresh token không tìm thấy hoặc đã bị thu hồi');
   }
 
-  // 3. (Quan trọng) Kiểm tra token này có thuộc về user đang yêu cầu logout không
+  // 4. (Quan trọng) Kiểm tra token này có thuộc về user đang yêu cầu logout không
   // (userId lấy từ Access Token đã được xác thực)
   if (refreshToken.userId !== userId) {
     throw createError(403, 'Không có quyền thu hồi token này');
   }
 
-  // 4. Thu hồi token bằng cách cập nhật trường `revoked`
+  // 5. Thu hồi token bằng cách cập nhật trường `revoked`
   await prisma.refreshToken.update({
     where: { id: refreshToken.id },
     data: { revoked: true },

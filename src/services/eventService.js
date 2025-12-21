@@ -129,7 +129,6 @@ const getEventByIdForAdmin = async (eventId) => {
       totalRegistrations,
     };
   } catch (error) {
-    console.error("Error in getEventByIdForAdmin:", error);
     throw error;
   }
 };
@@ -167,7 +166,6 @@ const getEventByIdForManager = async (eventId, managerId) => {
       participantCount: registrations.length,
     };
   } catch (error) {
-    console.error("Error in getEventByIdForManager:", error);
     throw error;
   }
 };

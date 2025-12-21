@@ -164,16 +164,14 @@ const getDashboardData = async (user) => {
 
 const getSystemStats = async () => {
   const [totalUsers, totalEvents, totalPosts] = await prisma.$transaction([
-    // 1. Đếm tổng User (có thể lọc where: { isActive: true } nếu muốn)
-    prisma.user.count(),
+    // 1. Đếm User đang hoạt động
+    prisma.user.count({ where: { isActive: true } }),
 
-    // 2. Đếm tổng Event
-    prisma.event.count(),
+    // 2. Đếm Event đã được duyệt
+    prisma.event.count({ where: { status: 'APPROVED' } }),
 
-    // 3. Đếm tổng Post
-    // Lưu ý: Tùy nghiệp vụ, bạn có thể chỉ đếm bài APPROVED
-    // prisma.post.count({ where: { status: 'APPROVED' } }), 
-    prisma.post.count(), 
+    // 3. Đếm Post đã được duyệt
+    prisma.post.count({ where: { status: 'APPROVED' } }),
   ]);
 
   return {
