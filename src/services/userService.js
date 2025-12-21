@@ -45,6 +45,7 @@ const listUsers = async options => {
         avatarUrl: true,
         bio: true,
         location: true,
+        phoneNumber: true,
       },
       orderBy: {
         createdAt: 'desc',
